@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_dark"
+    android:fillViewport="true"
+    android:scrollbars="none">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="48dp"
+        android:paddingTop="32dp"
+        android:paddingEnd="48dp"
+        android:paddingBottom="48dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textColor="@color/text_primary"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="24dp"
+            android:text="@string/header_subtitle"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/status_prefix"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/overlay_status_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            android:text="@string/status_overlay_stopped"
+            android:textColor="@color/danger"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <!-- ===== Stream ===== -->
+        <TextView style="@style/SectionHeader" android:text="@string/section_stream" />
+
+        <TextView style="@style/FieldLabel" android:text="@string/label_rtsp_url" />
+        <EditText
+            android:id="@+id/input_rtsp_url"
+            style="@style/FieldInput"
+            android:hint="@string/hint_rtsp_url"
+            android:inputType="textUri" />
+
+        <TextView style="@style/FieldLabel" android:text="@string/label_username" />
+        <EditText
+            android:id="@+id/input_username"
+            style="@style/FieldInput"
+            android:hint="@string/hint_username"
+            android:inputType="text" />
+
+        <TextView style="@style/FieldLabel" android:text="@string/label_password" />
+        <EditText
+            android:id="@+id/input_password"
+            style="@style/FieldInput"
+            android:hint="@string/hint_password"
+            android:inputType="textPassword" />
+
+        <Button
+            android:id="@+id/btn_test_connection"
+            style="@style/SecondaryButton"
+            android:layout_marginTop="8dp"
+            android:text="@string/btn_test_connection" />
+
+        <TextView
+            android:id="@+id/test_status_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
+
+        <!-- ===== Appearance ===== -->
+        <TextView style="@style/SectionHeader" android:text="@string/section_appearance" />
+
+        <TextView style="@style/FieldLabel" android:text="@string/label_position" />
+        <RadioGroup
+            android:id="@+id/group_position"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <TextView style="@style/FieldLabel" android:text="@string/label_size" />
+        <RadioGroup
+            android:id="@+id/group_size"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <TextView style="@style/FieldLabel" android:text="@string/label_opacity" />
+        <RadioGroup
+            android:id="@+id/group_opacity"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <Switch
+            android:id="@+id/switch_mute"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/label_mute"
+            android:textColor="@color/text_primary" />
+
+        <!-- ===== Automation ===== -->
+        <TextView style="@style/SectionHeader" android:text="@string/section_automation" />
+
+        <Switch
+            android:id="@+id/switch_autostart"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/label_autostart"
+            android:textColor="@color/text_primary" />
+
+        <!-- ===== Permissions ===== -->
+        <TextView style="@style/SectionHeader" android:text="@string/section_permissions" />
+
+        <TextView style="@style/FieldLabel" android:text="@string/label_overlay_permission" />
+        <TextView
+            android:id="@+id/overlay_permission_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:textSize="14sp" />
+        <Button
+            android:id="@+id/btn_grant_overlay_permission"
+            style="@style/SecondaryButton"
+            android:text="@string/btn_grant_overlay_permission" />
+
+        <TextView
+            style="@style/FieldLabel"
+            android:layout_marginTop="16dp"
+            android:text="@string/label_notification_permission" />
+        <TextView
+            android:id="@+id/notification_permission_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:textSize="14sp" />
+        <Button
+            android:id="@+id/btn_grant_notification_permission"
+            style="@style/SecondaryButton"
+            android:text="@string/btn_grant_notification_permission" />
+
+        <!-- ===== Actions ===== -->
+        <Button
+            android:id="@+id/btn_save_start"
+            style="@style/PrimaryButton"
+            android:layout_marginTop="32dp"
+            android:text="@string/btn_save_start" />
+
+        <Button
+            android:id="@+id/btn_stop"
+            style="@style/SecondaryButton"
+            android:layout_marginTop="12dp"
+            android:text="@string/btn_stop" />
+
+    </LinearLayout>
+</ScrollView>

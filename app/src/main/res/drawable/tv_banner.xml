@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android TV home-screen banner (320x180dp per Android TV guidelines). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path
+        android:fillColor="#1B2735"
+        android:pathData="M0,0h320v180h-320z" />
+    <path
+        android:fillColor="#4FD1C5"
+        android:pathData="M160,50 C182.09,50 200,67.91 200,90 C200,112.09 182.09,130 160,130 C137.91,130 120,112.09 120,90 C120,67.91 137.91,50 160,50 Z M160,63 C145.09,63 133,75.09 133,90 C133,104.91 145.09,117 160,117 C174.91,117 187,104.91 187,90 C187,75.09 174.91,63 160,63 Z" />
+    <path
+        android:fillColor="#0F1720"
+        android:pathData="M160,75 C169.39,75 177,82.61 177,92 C177,101.39 169.39,109 160,109 C150.61,109 143,101.39 143,92 C143,82.61 150.61,75 160,75 Z" />
+</vector>

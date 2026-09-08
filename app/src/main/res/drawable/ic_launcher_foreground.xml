@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- outer lens ring -->
+    <path
+        android:fillColor="#4FD1C5"
+        android:pathData="M54,20 C72.77,20 88,35.23 88,54 C88,72.77 72.77,88 54,88 C35.23,88 20,72.77 20,54 C20,35.23 35.23,20 54,20 Z M54,30 C40.75,30 30,40.75 30,54 C30,67.25 40.75,78 54,78 C67.25,78 78,67.25 78,54 C78,40.75 67.25,30 54,30 Z" />
+    <!-- pupil -->
+    <path
+        android:fillColor="#0F1720"
+        android:pathData="M54,42 C61.73,42 68,48.27 68,56 C68,63.73 61.73,70 54,70 C46.27,70 40,63.73 40,56 C40,48.27 46.27,42 54,42 Z" />
+    <!-- highlight -->
+    <path
+        android:fillColor="#4FD1C5"
+        android:pathData="M48,50 C50.21,50 52,51.79 52,54 C52,56.21 50.21,58 48,58 C45.79,58 44,56.21 44,54 C44,51.79 45.79,50 48,50 Z" />
+</vector>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BabyCam Overlay</string>
+    <string name="header_subtitle">Floating baby camera that stays on top of whatever\'s on the TV</string>
+
+    <string name="status_prefix">Overlay status</string>
+    <string name="status_overlay_running">Running</string>
+    <string name="status_overlay_stopped">Stopped</string>
+
+    <string name="section_stream">Camera stream</string>
+    <string name="label_rtsp_url">RTSP URL</string>
+    <string name="hint_rtsp_url">rtsp://192.168.1.50:554/stream1</string>
+    <string name="label_username">Username (optional)</string>
+    <string name="hint_username">admin</string>
+    <string name="label_password">Password (optional)</string>
+    <string name="hint_password">••••••••</string>
+    <string name="btn_test_connection">Test connection</string>
+    <string name="test_connecting">Connecting…</string>
+    <string name="test_success">✓ Connected — stream is reachable</string>
+    <string name="test_failed">✗ Failed: %1$s</string>
+    <string name="test_timeout">✗ Timed out waiting for the camera</string>
+    <string name="validation_missing_url">Enter an RTSP URL first</string>
+
+    <string name="section_appearance">Overlay appearance</string>
+    <string name="label_position">Screen position</string>
+    <string name="label_size">Size</string>
+    <string name="label_opacity">Opacity</string>
+    <string name="label_mute">Play camera audio (muted by default)</string>
+
+    <string name="section_automation">Automation</string>
+    <string name="label_autostart">Start overlay automatically on boot</string>
+
+    <string name="section_permissions">Permissions</string>
+    <string name="label_overlay_permission">Display over other apps</string>
+    <string name="btn_grant_overlay_permission">Grant overlay permission</string>
+    <string name="label_notification_permission">Notifications (required on Android 13+ to keep the overlay alive)</string>
+    <string name="btn_grant_notification_permission">Grant notification permission</string>
+    <string name="status_granted">✓ Granted</string>
+    <string name="status_not_granted">✗ Not granted</string>
+    <string name="status_not_required">Not required on this Android version</string>
+
+    <string name="btn_save_start">Save &amp; start overlay</string>
+    <string name="btn_stop">Stop overlay</string>
+
+    <string name="notification_channel_name">BabyCam overlay</string>
+    <string name="notification_title">BabyCam overlay is running</string>
+    <string name="notification_text">Camera feed is showing on top of the TV screen</string>
+    <string name="notification_action_stop">Stop</string>
+
+    <string name="overlay_reconnecting">Reconnecting…</string>
+</resources>
