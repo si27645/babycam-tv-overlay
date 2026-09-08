@@ -17,8 +17,8 @@ class BootReceiver : BroadcastReceiver() {
 
         val settings = SettingsStore(context)
         if (!settings.autoStartOnBoot) return
-        if (settings.rtspUrl.isBlank()) return
-        if (!Settings.canDrawOverlays(context)) return
+        if (settings.enabledCameras().isEmpty()) return
+        if (!canDrawOverlaysCompat(context)) return
 
         val serviceIntent = Intent(context, OverlayService::class.java)
         ContextCompat.startForegroundService(context, serviceIntent)

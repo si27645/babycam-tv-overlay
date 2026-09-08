@@ -1,3 +1,5 @@
+@file:androidx.annotation.OptIn(markerClass = [androidx.media3.common.util.UnstableApi::class])
+
 package com.babycam.overlay
 
 import android.app.Notification
@@ -7,6 +9,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
@@ -15,36 +18,57 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 
 /**
- * Foreground service that owns the always-on-top camera window.
+ * Foreground service that owns the always-on-top camera window. Shows either one camera at a
+ * time (rotating through the enabled list on a timer) or up to four at once in a grid,
+ * depending on [SettingsStore.layoutMode].
  *
  * Design note: the overlay is deliberately non-touchable/non-focusable at all times
  * (FLAG_NOT_TOUCHABLE | FLAG_NOT_FOCUSABLE). Most Android TV boxes are driven by a D-pad
  * remote with no pointer, so a floating window that could "steal" touch/focus from
  * whatever's underneath (the launcher, Netflix, YouTube...) would break normal TV usage.
- * All positioning/sizing/opacity/mute controls instead live in MainActivity and are pushed
- * into this service via intents - see ACTION_REFRESH_SETTINGS / ACTION_RESTART_STREAM.
+ * All positioning/sizing/opacity/mute/camera-list controls instead live in MainActivity and
+ * are pushed into this service via intents - see ACTION_REFRESH_SETTINGS / ACTION_RESTART_STREAM.
  */
 class OverlayService : Service() {
+
+    private data class CameraCell(
+        val container: FrameLayout,
+        val playerView: PlayerView,
+        val badge: TextView
+    )
+
+    private class CameraSlot(val cell: CameraCell) {
+        var player: ExoPlayer? = null
+        var retryAttempt = 0
+        var profile: CameraProfile? = null
+    }
 
     private lateinit var windowManager: WindowManager
     private lateinit var settings: SettingsStore
     private lateinit var overlayView: View
-    private lateinit var playerView: PlayerView
-    private lateinit var reconnectBadge: View
+    private lateinit var gridContainer: LinearLayout
     private lateinit var layoutParams: WindowManager.LayoutParams
     private var overlayAttached = false
 
-    private var player: ExoPlayer? = null
+    private val slots = mutableListOf<CameraSlot>()
+    private var rotationQueue: List<CameraProfile> = emptyList()
+    private var rotationIndex = 0
+    private val rotationRunnable = Runnable { advanceRotation() }
+
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var retryAttempt = 0
     private var isDestroyed = false
 
     override fun onCreate() {
@@ -64,7 +88,7 @@ class OverlayService : Service() {
             ACTION_REFRESH_SETTINGS -> {
                 if (overlayAttached) {
                     applyLayout()
-                    player?.volume = if (settings.muted) 0f else 1f
+                    slots.forEach { it.player?.volume = if (settings.muted) 0f else 1f }
                     return START_STICKY
                 }
                 // Overlay not showing yet - fall through and do a full start instead.
@@ -72,14 +96,14 @@ class OverlayService : Service() {
 
             ACTION_RESTART_STREAM -> {
                 ensureForegroundAndOverlay()
-                startPlayback()
+                rebuildSlotsAndStart()
                 return START_STICKY
             }
         }
 
         ensureForegroundAndOverlay()
-        if (player == null) {
-            startPlayback()
+        if (slots.isEmpty()) {
+            rebuildSlotsAndStart()
         }
         settings.overlayEnabled = true
         return START_STICKY
@@ -95,9 +119,7 @@ class OverlayService : Service() {
     private fun showOverlay() {
         val inflater = LayoutInflater.from(this)
         overlayView = inflater.inflate(R.layout.overlay_camera, null)
-        playerView = overlayView.findViewById(R.id.overlay_player_view)
-        reconnectBadge = overlayView.findViewById(R.id.overlay_reconnecting)
-        playerView.useController = false
+        gridContainer = overlayView.findViewById(R.id.overlay_grid_container)
 
         val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -124,12 +146,12 @@ class OverlayService : Service() {
     private fun applyLayout() {
         val metrics = resources.displayMetrics
         val width = (metrics.widthPixels * settings.size.widthPercent).toInt()
-        val height = (width * 9.0 / 16.0).toInt() // 16:9 box; PlayerView letterboxes the real feed inside it
+        val height = (width * 9.0 / 16.0).toInt() // 16:9 box; each PlayerView letterboxes its real feed inside its cell
 
         layoutParams.width = width
         layoutParams.height = height
         layoutParams.gravity = gravityFor(settings.position)
-        val margin = (16 * metrics.density).toInt()
+        val margin = dp(16)
         layoutParams.x = margin
         layoutParams.y = margin
 
@@ -148,29 +170,117 @@ class OverlayService : Service() {
         OverlayPosition.CENTER -> Gravity.CENTER
     }
 
-    private fun startPlayback() {
-        releasePlayer()
-        val url = settings.buildAuthenticatedUrl()
-        if (url.isBlank()) {
+    // ---- Camera slots (single-rotate or grid) --------------------------------------------
+
+    private fun rebuildSlotsAndStart() {
+        releaseAllSlots()
+
+        val enabled = settings.enabledCameras()
+        if (enabled.isEmpty()) {
             stopSelf()
             return
         }
 
+        when (settings.layoutMode) {
+            LayoutMode.SINGLE_ROTATE -> {
+                val cells = buildGridRows(1)
+                val slot = CameraSlot(cells[0])
+                slots.add(slot)
+                rotationQueue = enabled
+                rotationIndex = 0
+                playCamera(slot, rotationQueue[0])
+                if (rotationQueue.size > 1) scheduleRotation()
+            }
+
+            LayoutMode.GRID -> {
+                val capped = enabled.take(MAX_GRID_CAMERAS)
+                val cells = buildGridRows(capped.size)
+                capped.forEachIndexed { index, profile ->
+                    val slot = CameraSlot(cells[index])
+                    slots.add(slot)
+                    playCamera(slot, profile)
+                }
+            }
+        }
+    }
+
+    /** Lays out [count] (1-4) equally-sized cells as rows of a vertical LinearLayout and returns them in order. */
+    private fun buildGridRows(count: Int): List<CameraCell> {
+        gridContainer.removeAllViews()
+        val cells = mutableListOf<CameraCell>()
+
+        fun addRow(cellsInRow: Int) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+            }
+            repeat(cellsInRow) {
+                val cell = buildCell()
+                cell.container.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f).apply {
+                    setMargins(dp(1), dp(1), dp(1), dp(1))
+                }
+                row.addView(cell.container)
+                cells.add(cell)
+            }
+            gridContainer.addView(row)
+        }
+
+        when (count.coerceAtLeast(1)) {
+            1 -> addRow(1)
+            2 -> addRow(2)
+            3 -> { addRow(2); addRow(1) }
+            else -> { addRow(2); addRow(2) }
+        }
+        return cells
+    }
+
+    private fun buildCell(): CameraCell {
+        val container = FrameLayout(this)
+        val playerView = PlayerView(this).apply {
+            useController = false
+            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+            layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        }
+        val badge = TextView(this).apply {
+            text = getString(R.string.overlay_reconnecting)
+            setTextColor(Color.WHITE)
+            setBackgroundResource(R.drawable.reconnect_badge_background)
+            setPadding(dp(10), dp(4), dp(10), dp(4))
+            textSize = 12f
+            visibility = View.GONE
+            layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                gravity = Gravity.CENTER
+            }
+        }
+        container.addView(playerView)
+        container.addView(badge)
+        return CameraCell(container, playerView, badge)
+    }
+
+    private fun playCamera(slot: CameraSlot, profile: CameraProfile) {
+        slot.player?.release()
+        slot.profile = profile
+        slot.retryAttempt = 0
+        slot.cell.badge.visibility = View.GONE
+
+        val url = profile.authenticatedUrl()
+        if (url.isBlank()) return
+
         val exoPlayer = RtspPlayerFactory.createPlayer(this)
-        player = exoPlayer
-        playerView.player = exoPlayer
+        slot.player = exoPlayer
+        slot.cell.playerView.player = exoPlayer
         exoPlayer.volume = if (settings.muted) 0f else 1f
 
         exoPlayer.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_READY) {
-                    retryAttempt = 0
-                    reconnectBadge.visibility = View.GONE
+                    slot.retryAttempt = 0
+                    slot.cell.badge.visibility = View.GONE
                 }
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                scheduleReconnect()
+                scheduleReconnect(slot)
             }
         })
 
@@ -179,23 +289,35 @@ class OverlayService : Service() {
         exoPlayer.playWhenReady = true
     }
 
-    private fun scheduleReconnect() {
+    private fun scheduleReconnect(slot: CameraSlot) {
         if (isDestroyed) return
-        if (::reconnectBadge.isInitialized) {
-            reconnectBadge.visibility = View.VISIBLE
-        }
-        val delayMs = minOf(5_000L * (retryAttempt + 1), 30_000L)
-        retryAttempt++
+        slot.cell.badge.visibility = View.VISIBLE
+        val delayMs = minOf(5_000L * (slot.retryAttempt + 1), 30_000L)
+        slot.retryAttempt++
+        val profile = slot.profile ?: return
         mainHandler.postDelayed({
-            if (!isDestroyed) startPlayback()
+            if (!isDestroyed) playCamera(slot, profile)
         }, delayMs)
     }
 
-    private fun releasePlayer() {
-        mainHandler.removeCallbacksAndMessages(null)
-        player?.release()
-        player = null
+    private fun scheduleRotation() {
+        mainHandler.postDelayed(rotationRunnable, settings.rotationIntervalSeconds * 1000L)
     }
+
+    private fun advanceRotation() {
+        if (isDestroyed || slots.isEmpty() || rotationQueue.size <= 1) return
+        rotationIndex = (rotationIndex + 1) % rotationQueue.size
+        playCamera(slots[0], rotationQueue[rotationIndex])
+        scheduleRotation()
+    }
+
+    private fun releaseAllSlots() {
+        mainHandler.removeCallbacksAndMessages(null)
+        slots.forEach { it.player?.release() }
+        slots.clear()
+    }
+
+    // ---- Notification ----------------------------------------------------------------------
 
     private fun buildNotification(): Notification {
         val stopIntent = Intent(this, OverlayService::class.java).apply { action = ACTION_STOP }
@@ -234,7 +356,7 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         isDestroyed = true
-        releasePlayer()
+        releaseAllSlots()
         if (overlayAttached && overlayView.isAttachedToWindow) {
             windowManager.removeView(overlayView)
         }
@@ -252,10 +374,11 @@ class OverlayService : Service() {
         /** Re-apply position/size/opacity/mute to an already-running overlay without touching playback. */
         const val ACTION_REFRESH_SETTINGS = "com.babycam.overlay.action.REFRESH_SETTINGS"
 
-        /** The RTSP URL/credentials changed - tear down and rebuild playback. */
+        /** The camera list, layout mode, or rotation interval changed - tear down and rebuild playback. */
         const val ACTION_RESTART_STREAM = "com.babycam.overlay.action.RESTART_STREAM"
 
         private const val CHANNEL_ID = "babycam_overlay_channel"
         private const val NOTIFICATION_ID = 42
+        private const val MAX_GRID_CAMERAS = 4
     }
 }

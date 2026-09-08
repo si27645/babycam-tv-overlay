@@ -50,46 +50,37 @@
             android:textSize="16sp"
             android:textStyle="bold" />
 
-        <!-- ===== Stream ===== -->
-        <TextView style="@style/SectionHeader" android:text="@string/section_stream" />
+        <!-- ===== Cameras ===== -->
+        <TextView style="@style/SectionHeader" android:text="@string/section_cameras" />
 
-        <TextView style="@style/FieldLabel" android:text="@string/label_rtsp_url" />
-        <EditText
-            android:id="@+id/input_rtsp_url"
-            style="@style/FieldInput"
-            android:hint="@string/hint_rtsp_url"
-            android:inputType="textUri" />
-
-        <TextView style="@style/FieldLabel" android:text="@string/label_username" />
-        <EditText
-            android:id="@+id/input_username"
-            style="@style/FieldInput"
-            android:hint="@string/hint_username"
-            android:inputType="text" />
-
-        <TextView style="@style/FieldLabel" android:text="@string/label_password" />
-        <EditText
-            android:id="@+id/input_password"
-            style="@style/FieldInput"
-            android:hint="@string/hint_password"
-            android:inputType="textPassword" />
+        <LinearLayout
+            android:id="@+id/camera_list_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
 
         <Button
-            android:id="@+id/btn_test_connection"
+            android:id="@+id/btn_add_camera"
             style="@style/SecondaryButton"
-            android:layout_marginTop="8dp"
-            android:text="@string/btn_test_connection" />
-
-        <TextView
-            android:id="@+id/test_status_text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp" />
+            android:layout_marginTop="12dp"
+            android:text="@string/btn_add_camera" />
 
         <!-- ===== Appearance ===== -->
         <TextView style="@style/SectionHeader" android:text="@string/section_appearance" />
+
+        <TextView style="@style/FieldLabel" android:text="@string/label_layout_mode" />
+        <RadioGroup
+            android:id="@+id/group_layout_mode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <TextView style="@style/FieldLabel" android:text="@string/label_rotation_interval" />
+        <RadioGroup
+            android:id="@+id/group_rotation_interval"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
 
         <TextView style="@style/FieldLabel" android:text="@string/label_position" />
         <RadioGroup
@@ -112,7 +103,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical" />
 
-        <Switch
+        <androidx.appcompat.widget.SwitchCompat
             android:id="@+id/switch_mute"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -123,7 +114,7 @@
         <!-- ===== Automation ===== -->
         <TextView style="@style/SectionHeader" android:text="@string/section_automation" />
 
-        <Switch
+        <androidx.appcompat.widget.SwitchCompat
             android:id="@+id/switch_autostart"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

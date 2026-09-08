@@ -1,20 +1,43 @@
 # BabyCam Overlay
 
-A native Android app that shows a live RTSP camera feed as a floating window
-always on top of whatever else is playing on an Android TV box — a baby
-monitor overlay for the TV.
+A native Android app that shows one or more live RTSP camera feeds as a
+floating window always on top of whatever else is playing on an Android TV
+box — a baby monitor overlay for the TV.
 
 ## How it works
 
-- **MainActivity** is the control panel: enter the camera's RTSP URL and
-  credentials, pick where the overlay sits and how big/opaque it is, grant
-  the required permissions, and start/stop the overlay.
-- **OverlayService** is a foreground service that draws the camera feed in a
-  system-level window (`TYPE_APPLICATION_OVERLAY`) on top of every other app,
-  using AndroidX Media3/ExoPlayer's RTSP support to decode the stream. It
-  auto-reconnects with backoff if the camera drops off Wi-Fi.
+- **MainActivity** is the control panel: manage a list of saved cameras (add,
+  edit, delete, enable/disable, each with an ONVIF discovery scan and a
+  connection test), choose single-feed vs. grid layout, pick where the
+  overlay sits and how big/opaque it is, grant the required permissions, and
+  start/stop the overlay.
+- **OverlayService** is a foreground service that draws the camera feed(s) in
+  a system-level window (`TYPE_APPLICATION_OVERLAY`) on top of every other
+  app, using AndroidX Media3/ExoPlayer's RTSP support to decode each stream.
+  Every camera slot auto-reconnects independently with backoff if it drops
+  off Wi-Fi.
 - **BootReceiver** restarts the overlay after the box reboots, if you enabled
   "Start overlay automatically on boot".
+- **OnvifDiscovery** is a small hand-rolled WS-Discovery + ONVIF SOAP client
+  (no extra library) used from the "Add camera" dialog to find cameras on the
+  LAN and, best-effort, resolve their actual RTSP stream URL.
+
+### Multiple cameras: single-feed rotation or a grid
+
+Every saved camera has an **enabled** flag; the enabled ones participate in
+the overlay according to the **Multiple cameras** setting:
+
+- **Single feed (rotate through cameras)** — one camera at a time, advancing
+  to the next enabled one every N seconds (15/30/60s). With only one enabled
+  camera it just stays on it, no rotation timer.
+- **Grid** — up to 4 enabled cameras shown at once, each in its own tile
+  (1 → full size, 2 → side by side, 3 → two-plus-one, 4 → 2×2). Each tile
+  reconnects independently, so one camera dropping off doesn't affect the
+  others.
+
+Grid mode runs one ExoPlayer/RTSP decode per tile, so on very low-end boxes
+prefer single-feed rotation if 3-4 simultaneous decodes turns out to be more
+than the hardware can handle smoothly.
 
 ### Design decision: the overlay is remote-only, not touch-drag
 
@@ -23,13 +46,27 @@ floating window that intercepted touch/focus could break navigation in
 whatever app is running underneath it (Netflix, the launcher, etc.), so the
 overlay window is **always** `FLAG_NOT_TOUCHABLE | FLAG_NOT_FOCUSABLE` — it's
 a pure passthrough video surface. All positioning (5 screen corners/center),
-sizing (4 presets), opacity (3 levels) and mute are instead controlled from
-the app's own screen, which you reach by pressing Home/back and reopening
-the app from the launcher — updates apply live without restarting the stream.
+sizing (4 presets), opacity (3 levels), mute, and the camera list itself are
+instead controlled from the app's own screen, which you reach by pressing
+Home/back and reopening the app from the launcher — cosmetic changes
+(position/size/opacity/mute) apply live without restarting the stream;
+camera-list/layout-mode/rotation changes restart playback.
 
 If you specifically have a box with a mouse-like remote or USB mouse and
 want drag-to-reposition later, that's a reasonable follow-up but isn't
 implemented here by design (see `OverlayService.kt` for where to add it).
+
+### ONVIF discovery is best-effort
+
+The "Discover cameras (ONVIF)" button in the add/edit dialog sends a
+WS-Discovery UDP probe and lists cameras that respond — this part is
+standardized and fairly reliable. Tapping a result then tries to
+automatically resolve the actual RTSP URL via ONVIF's
+GetCapabilities → GetProfiles → GetStreamUri SOAP calls, using whatever
+username/password you've typed in. Vendor ONVIF implementations are
+notoriously inconsistent, so this step can legitimately fail on some
+cameras — when it does, the dialog fills in the camera's IP with a common
+default RTSP port so you can finish the path by hand instead.
 
 ## Requirements
 
@@ -38,7 +75,8 @@ implemented here by design (see `OverlayService.kt` for where to add it).
   needed.
 - A camera that exposes an **RTSP** stream (most dedicated IP cameras, NVRs,
   and many baby monitors do — check the manufacturer's app/manual for the
-  RTSP URL, typically `rtsp://<ip>:554/...`).
+  RTSP URL, typically `rtsp://<ip>:554/...`, or use the in-app ONVIF
+  discovery to try to find it automatically).
 - A TV box running Android 5.0 (API 21) or newer, with a way to sideload an
   APK (see below) since this isn't published to the Play Store.
 
@@ -49,9 +87,10 @@ cd babycam-tv-overlay
 ./gradlew assembleDebug
 ```
 
-The APK lands at `app/build/outputs/apk/debug/app-debug.apk`. This was
-already built and verified once during setup — `assembleDebug` succeeds
-cleanly with AGP 8.5.2 / Gradle 8.13 / JDK 17.
+The APK lands at `app/build/outputs/apk/debug/app-debug.apk`. This project
+builds clean with AGP 8.5.2 / Gradle 8.13 / JDK 17, and `lintDebug` passes
+with no errors (only informational warnings — dependency-update notices,
+accessibility/autofill hints, etc.).
 
 For a release build to actually keep on a device long-term, sign it (Android
 Studio → Build → Generate Signed Bundle/APK) rather than shipping the debug
@@ -82,14 +121,18 @@ file manager once).
 3. On Android 13+ boxes, also tap **Grant notification permission** (the
    foreground service needs an ongoing notification to stay alive in the
    background reliably).
-4. Under **Camera stream**, enter the RTSP URL (and username/password if
-   your camera needs them — credentials get URL-encoded automatically), then
-   tap **Test connection** to confirm the box can actually reach the camera
-   before committing to it.
-5. Pick a position/size/opacity you like, leave audio muted unless you want
+4. Under **Cameras**, tap **Add camera**. Either tap **Discover cameras
+   (ONVIF)** and pick one from the scan, or type the RTSP URL (and
+   username/password if needed — credentials get URL-encoded automatically).
+   Tap **Test connection** to confirm the box can actually reach the camera,
+   then **Save**. Repeat for additional cameras.
+5. If you added more than one camera, pick **Single feed** or **Grid** under
+   **Multiple cameras**, and a rotation interval if using single-feed with
+   2+ cameras enabled.
+6. Pick a position/size/opacity you like, leave audio muted unless you want
    to hear the room, and optionally enable **Start overlay automatically on
    boot**.
-6. Tap **Save & start overlay**. Press Home — the camera feed should now
+7. Tap **Save & start overlay**. Press Home — the camera feed(s) should now
    float on top of the TV home screen and stay there as you switch apps.
 
 ## Troubleshooting
@@ -115,26 +158,42 @@ file manager once).
   contains an audio track (many cheap cameras are video-only over RTSP, or
   need a specific codec Media3 doesn't support — check Logcat filtered on
   `ExoPlayer`/ `RtspMediaSource` for codec errors).
+- **ONVIF discovery finds nothing.** Many cameras don't implement ONVIF at
+  all (check the manufacturer's spec sheet), or advertise on a different
+  subnet/VLAN than the TV box. Type the RTSP URL manually in that case.
+- **ONVIF discovery finds the camera but "Discover" can't fill in the
+  stream URL.** Expected on some vendors' partial/buggy ONVIF stacks — the
+  dialog fills in the IP with the default RTSP port; check the camera's
+  manual/web UI for its actual stream path and finish the URL by hand.
+- **Grid mode is choppy/stutters on some tiles.** Decoding 3-4 RTSP streams
+  at once is real CPU/GPU load for a cheap box's hardware decoder. Switch to
+  **Single feed (rotate through cameras)** instead.
 
 ## Project layout
 
 ```
 app/src/main/java/com/babycam/overlay/
-  MainActivity.kt        control panel UI + permission flow + connection test
-  OverlayService.kt       foreground service, WindowManager overlay, playback + reconnect
+  MainActivity.kt        control panel UI: camera list CRUD, appearance, permissions
+  OverlayService.kt       foreground service, WindowManager overlay, N camera slots + reconnect/rotation
+  OnvifDiscovery.kt        WS-Discovery probe + best-effort ONVIF SOAP client (no extra library)
+  CameraProfile.kt         one saved camera (name/url/credentials/enabled) + JSON (de)serialization
   BootReceiver.kt          restarts the overlay after reboot if auto-start is on
-  SettingsStore.kt         SharedPreferences-backed settings (URL, creds, layout, flags)
-  RtspPlayerFactory.kt      shared ExoPlayer/RTSP MediaSource construction
+  SettingsStore.kt         SharedPreferences-backed settings (camera list, layout, flags)
+  RtspPlayerFactory.kt     shared ExoPlayer/RTSP MediaSource construction
+  Util.kt                  small shared helpers (dp conversion, pre-23-safe overlay-permission check)
 app/src/main/res/
-  layout/activity_main.xml        control panel layout
-  layout/overlay_camera.xml       the floating window's content
-  values/                          strings, colors, TV-friendly dark theme/styles
-  drawable/, mipmap*/              launcher icon, TV banner, notification icon, overlay chrome
+  layout/activity_main.xml         control panel layout
+  layout/dialog_camera_editor.xml  add/edit camera dialog (fields, discovery results, test)
+  layout/overlay_camera.xml        the floating window's root container (populated at runtime)
+  values/                           strings, colors, TV-friendly dark theme/styles
+  drawable/, mipmap*/               launcher icon, TV banner, notification icon, overlay chrome
 ```
 
 ## Possible follow-ups
 
 - Touch-drag repositioning for boxes with a mouse-capable remote.
-- Multi-camera support (cycle/grid of more than one feed).
-- ONVIF/mDNS camera discovery instead of typing the RTSP URL by hand.
+- Per-camera layout overrides (e.g. pin one camera to a corner regardless of mode).
 - A "snooze" timer that hides the overlay for N minutes.
+- Bump Media3 from 1.4.1 to the latest 1.x (lint flags 1.11.0 as available);
+  held back at 1.4.1 here only because it's the version this was built and
+  verified against.

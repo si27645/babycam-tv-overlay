@@ -2,7 +2,6 @@ package com.babycam.overlay
 
 import android.content.Context
 import android.content.SharedPreferences
-import java.net.URLEncoder
 
 /** Where the floating overlay window is anchored on screen. */
 enum class OverlayPosition(val label: String) {
@@ -27,6 +26,12 @@ enum class OverlayOpacity(val label: String, val alpha: Float) {
     FULL("100%", 1.0f)
 }
 
+/** How multiple enabled cameras are shown in the one overlay window. */
+enum class LayoutMode(val label: String) {
+    SINGLE_ROTATE("Single feed (rotate through cameras)"),
+    GRID("Grid - show up to 4 at once")
+}
+
 /**
  * Thin wrapper around SharedPreferences holding every user-configurable setting.
  * Shared by MainActivity (edits settings) and OverlayService / BootReceiver (reads them).
@@ -36,17 +41,23 @@ class SettingsStore(context: Context) {
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    var rtspUrl: String
-        get() = prefs.getString(KEY_RTSP_URL, "") ?: ""
-        set(value) = prefs.edit().putString(KEY_RTSP_URL, value.trim()).apply()
+    var cameras: List<CameraProfile>
+        get() = parseCameraProfiles(prefs.getString(KEY_CAMERAS, "") ?: "")
+        set(value) = prefs.edit().putString(KEY_CAMERAS, value.toJsonString()).apply()
 
-    var username: String
-        get() = prefs.getString(KEY_USERNAME, "") ?: ""
-        set(value) = prefs.edit().putString(KEY_USERNAME, value.trim()).apply()
+    /** The subset of [cameras] currently participating in the overlay (grid tiles, or the rotation set). */
+    fun enabledCameras(): List<CameraProfile> = cameras.filter { it.enabled && it.url.isNotBlank() }
 
-    var password: String
-        get() = prefs.getString(KEY_PASSWORD, "") ?: ""
-        set(value) = prefs.edit().putString(KEY_PASSWORD, value).apply()
+    var layoutMode: LayoutMode
+        get() = runCatching {
+            LayoutMode.valueOf(prefs.getString(KEY_LAYOUT_MODE, LayoutMode.SINGLE_ROTATE.name)!!)
+        }.getOrDefault(LayoutMode.SINGLE_ROTATE)
+        set(value) = prefs.edit().putString(KEY_LAYOUT_MODE, value.name).apply()
+
+    /** How long each camera stays on screen in SINGLE_ROTATE mode, when more than one is enabled. */
+    var rotationIntervalSeconds: Int
+        get() = prefs.getInt(KEY_ROTATION_INTERVAL, 30)
+        set(value) = prefs.edit().putInt(KEY_ROTATION_INTERVAL, value).apply()
 
     var position: OverlayPosition
         get() = runCatching {
@@ -79,30 +90,11 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean(KEY_OVERLAY_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_OVERLAY_ENABLED, value).apply()
 
-    /**
-     * Returns the RTSP URL with username/password injected as userinfo (rtsp://user:pass@host/...)
-     * unless the URL already carries credentials or no username is set.
-     */
-    fun buildAuthenticatedUrl(): String {
-        val url = rtspUrl
-        if (username.isBlank() || url.isBlank()) return url
-        return runCatching {
-            val schemeIdx = url.indexOf("://")
-            if (schemeIdx == -1) return url
-            val scheme = url.substring(0, schemeIdx + 3)
-            val rest = url.substring(schemeIdx + 3)
-            if (rest.contains("@")) return url // credentials already embedded
-            val encodedUser = URLEncoder.encode(username, "UTF-8")
-            val encodedPass = URLEncoder.encode(password, "UTF-8")
-            "$scheme$encodedUser:$encodedPass@$rest"
-        }.getOrDefault(url)
-    }
-
     companion object {
         private const val PREFS_NAME = "babycam_settings"
-        private const val KEY_RTSP_URL = "rtsp_url"
-        private const val KEY_USERNAME = "username"
-        private const val KEY_PASSWORD = "password"
+        private const val KEY_CAMERAS = "cameras"
+        private const val KEY_LAYOUT_MODE = "layout_mode"
+        private const val KEY_ROTATION_INTERVAL = "rotation_interval_seconds"
         private const val KEY_POSITION = "position"
         private const val KEY_SIZE = "size"
         private const val KEY_OPACITY = "opacity"

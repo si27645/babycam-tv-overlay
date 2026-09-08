@@ -6,14 +6,42 @@
     <string name="status_prefix">Overlay status</string>
     <string name="status_overlay_running">Running</string>
     <string name="status_overlay_stopped">Stopped</string>
+    <string name="status_no_cameras">Add at least one enabled camera first</string>
 
-    <string name="section_stream">Camera stream</string>
+    <string name="section_cameras">Cameras</string>
+    <string name="no_cameras_yet">No cameras added yet.</string>
+    <string name="unnamed_camera">Unnamed camera</string>
+    <string name="camera_disabled_label">%1$s (disabled)</string>
+    <string name="btn_add_camera">Add camera</string>
+    <string name="btn_edit">Edit</string>
+    <string name="btn_delete">Delete</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="confirm_delete_title">Delete camera?</string>
+    <string name="confirm_delete_message">Remove \"%1$s\" from the camera list?</string>
+
+    <string name="dialog_title_add_camera">Add camera</string>
+    <string name="dialog_title_edit_camera">Edit camera</string>
+    <string name="label_camera_name">Name</string>
+    <string name="hint_camera_name">Nursery</string>
+    <string name="label_camera_enabled">Enabled (shown in the overlay)</string>
+
     <string name="label_rtsp_url">RTSP URL</string>
     <string name="hint_rtsp_url">rtsp://192.168.1.50:554/stream1</string>
     <string name="label_username">Username (optional)</string>
     <string name="hint_username">admin</string>
     <string name="label_password">Password (optional)</string>
     <string name="hint_password">••••••••</string>
+
+    <string name="btn_discover_cameras">Discover cameras (ONVIF)</string>
+    <string name="discovering_cameras">Scanning the local network…</string>
+    <string name="no_cameras_found">No ONVIF cameras responded. Enter the RTSP URL manually.</string>
+    <string name="cameras_found">Found %1$d camera(s) — tap one to use it</string>
+    <string name="resolving_stream_uri">Asking the camera for its stream URL…</string>
+    <string name="stream_uri_resolved">✓ Stream URL filled in automatically</string>
+    <string name="stream_uri_not_resolved">Couldn\'t auto-resolve the stream path — filled in the IP, finish the URL by hand</string>
+    <string name="rtsp_fallback_url">rtsp://%1$s:554/</string>
+
     <string name="btn_test_connection">Test connection</string>
     <string name="test_connecting">Connecting…</string>
     <string name="test_success">✓ Connected — stream is reachable</string>
@@ -22,6 +50,9 @@
     <string name="validation_missing_url">Enter an RTSP URL first</string>
 
     <string name="section_appearance">Overlay appearance</string>
+    <string name="label_layout_mode">Multiple cameras</string>
+    <string name="label_rotation_interval">Rotation interval (single-feed mode, 2+ cameras)</string>
+    <string name="rotation_interval_option">%1$ds</string>
     <string name="label_position">Screen position</string>
     <string name="label_size">Size</string>
     <string name="label_opacity">Opacity</string>
