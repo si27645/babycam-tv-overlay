@@ -15,6 +15,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -215,7 +216,8 @@ class OverlayService : Service() {
     private fun rebuildSlotsAndStart() {
         releaseAllSlots()
 
-        val enabled = settings.enabledCameras()
+        val cameraList = settings.cameras
+        val enabled = settings.enabledCameras(cameraList)
         if (enabled.isEmpty()) {
             // Nothing to show in the main overlay - tear its window down if it's still up from
             // before (e.g. the user just disabled their last main camera), but keep the service
@@ -224,15 +226,19 @@ class OverlayService : Service() {
                 windowManager.removeView(overlayView)
             }
             overlayAttached = false
-            if (!settings.doorbellConfigured()) {
+            if (!settings.doorbellConfigured(cameraList)) {
                 stopSelf()
             }
             return
         }
 
         if (!overlayAttached) {
-            // Doorbell-only -> main-camera transition: the window wasn't created by
-            // ensureForegroundAndOverlay() earlier because there was nothing to show yet.
+            // Shouldn't happen: every call site calls ensureForegroundAndOverlay() immediately
+            // beforehand, which already creates the window under this same "enabled is
+            // non-empty" condition. Real fallback, not the normal path - if this ever fires it
+            // means that contract broke, so it's worth knowing about rather than silently
+            // relying on it.
+            Log.w(TAG, "rebuildSlotsAndStart(): overlay wasn't attached - ensureForegroundAndOverlay() should have created it")
             showOverlay()
         }
 
@@ -664,6 +670,7 @@ class OverlayService : Service() {
         /** MQTT broker/doorbell settings changed - reconnect the MQTT client without touching playback. */
         const val ACTION_REFRESH_DOORBELL = "com.babycam.overlay.action.REFRESH_DOORBELL"
 
+        private const val TAG = "OverlayService"
         private const val CHANNEL_ID = "babycam_overlay_channel"
         private const val NOTIFICATION_ID = 42
         private const val MAX_GRID_CAMERAS = 4

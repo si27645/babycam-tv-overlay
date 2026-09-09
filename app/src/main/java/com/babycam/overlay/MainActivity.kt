@@ -614,6 +614,17 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        // TAKEOVER mode has nothing to "take over" without a main overlay already on screen, so
+        // with no main camera enabled it silently no-ops on every trigger (see OverlayService's
+        // handleDoorbellTrigger). Catch that combination at save time instead of leaving the user
+        // with a config that reports "Running" but never actually shows the doorbell camera.
+        if (doorbellWillBeConfigured && settings.enabledCameras().isEmpty() &&
+            newDoorbellDisplayMode == DoorbellDisplayMode.TAKEOVER
+        ) {
+            overlayStatusText.text = getString(R.string.status_doorbell_takeover_needs_camera)
+            return
+        }
+
         val doorbellRelatedChanged = newMqttEnabled != settings.mqttEnabled ||
             newMqttHost != settings.mqttHost ||
             newMqttPort != settings.mqttPort ||

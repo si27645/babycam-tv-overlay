@@ -85,6 +85,7 @@
     <string name="label_doorbell_position">Separate-window position (only used in that mode)</string>
     <string name="label_doorbell_size">Separate-window size (only used in that mode)</string>
     <string name="status_doorbell_incomplete">Doorbell trigger needs a broker host and a camera picked</string>
+    <string name="status_doorbell_takeover_needs_camera">Doorbell trigger with no main camera enabled needs \'Separate window\' display mode — \'Take over\' has nothing to take over and will never show it</string>
 
     <string name="section_permissions">Permissions</string>
     <string name="label_overlay_permission">Display over other apps</string>

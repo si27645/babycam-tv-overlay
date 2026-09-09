@@ -57,8 +57,14 @@ class SettingsStore(context: Context) {
         get() = parseCameraProfiles(prefs.getString(KEY_CAMERAS, "") ?: "")
         set(value) = prefs.edit().putString(KEY_CAMERAS, value.toJsonString()).apply()
 
-    /** The subset of [cameras] currently participating in the overlay (grid tiles, or the rotation set). */
-    fun enabledCameras(): List<CameraProfile> = cameras.filter { it.enabled && it.url.isNotBlank() }
+    /**
+     * The subset of [cameraList] (defaults to re-fetching [cameras]) currently participating in
+     * the overlay (grid tiles, or the rotation set). Pass an already-fetched list from a caller
+     * that also needs [doorbellCameras]/[doorbellConfigured] in the same call, to avoid parsing
+     * the camera-list JSON twice.
+     */
+    fun enabledCameras(cameraList: List<CameraProfile> = cameras): List<CameraProfile> =
+        cameraList.filter { it.enabled && it.url.isNotBlank() }
 
     var layoutMode: LayoutMode
         get() = runCatching {
@@ -169,14 +175,15 @@ class SettingsStore(context: Context) {
         }.getOrDefault(OverlaySize.MEDIUM)
         set(value) = prefs.edit().putString(KEY_DOORBELL_SIZE, value.name).apply()
 
-    /** [doorbellCameraIds] resolved against the current camera list, in that list's order. */
-    fun doorbellCameras(): List<CameraProfile> {
+    /** [doorbellCameraIds] resolved against [cameraList] (defaults to re-fetching [cameras]), in that list's order. */
+    fun doorbellCameras(cameraList: List<CameraProfile> = cameras): List<CameraProfile> {
         val ids = doorbellCameraIds
-        return cameras.filter { it.id in ids }
+        return cameraList.filter { it.id in ids }
     }
 
     /** Whether the doorbell trigger is fully configured (enabled, a broker host, and at least one camera picked). */
-    fun doorbellConfigured(): Boolean = mqttEnabled && mqttHost.isNotBlank() && doorbellCameras().isNotEmpty()
+    fun doorbellConfigured(cameraList: List<CameraProfile> = cameras): Boolean =
+        mqttEnabled && mqttHost.isNotBlank() && doorbellCameras(cameraList).isNotEmpty()
 
     /**
      * Whether OverlayService has any reason to be running at all: main cameras to show, or
@@ -184,7 +191,10 @@ class SettingsStore(context: Context) {
      * Without this, turning off every main camera (or never enabling one) would also silently
      * kill MQTT listening, even if the doorbell trigger was otherwise fully set up.
      */
-    fun needsOverlayService(): Boolean = enabledCameras().isNotEmpty() || doorbellConfigured()
+    fun needsOverlayService(): Boolean {
+        val cameraList = cameras
+        return enabledCameras(cameraList).isNotEmpty() || doorbellConfigured(cameraList)
+    }
 
     companion object {
         private const val PREFS_NAME = "babycam_settings"
