@@ -15,7 +15,10 @@ box — a baby monitor overlay for the TV.
   a system-level window (`TYPE_APPLICATION_OVERLAY`) on top of every other
   app, using AndroidX Media3/ExoPlayer's RTSP support to decode each stream.
   Every camera slot auto-reconnects independently with backoff if it drops
-  off Wi-Fi.
+  off Wi-Fi or the connection errors out - and separately, if a slot sits
+  buffering with no picture for more than 15s (an RTSP stream going quiet
+  without ever raising an error, which does happen), it's force-reconnected
+  too rather than staying frozen indefinitely.
 - **BootReceiver** restarts the overlay after the box reboots, if you enabled
   "Start overlay automatically on boot".
 - **OnvifDiscovery** is a small hand-rolled WS-Discovery + ONVIF SOAP client
@@ -317,6 +320,15 @@ file manager once).
   stream URL.** Expected on some vendors' partial/buggy ONVIF stacks — the
   dialog fills in the IP with the default RTSP port; check the camera's
   manual/web UI for its actual stream path and finish the URL by hand.
+- **A camera's picture freezes on a single frame (not black, not
+  reconnecting - just stuck) until you restart the overlay.** This was a
+  real gap: ExoPlayer doesn't always raise an error when an RTSP stream
+  goes quiet mid-playback (a camera hiccup, a brief Wi-Fi drop, a socket
+  left half-open), so the existing error-triggered reconnect never fired
+  and the frozen frame just sat there. Fixed by a stall watchdog - a slot
+  stuck buffering for more than 15s with no picture is now force-reconnected
+  automatically, same as an outright error. If you still see this after
+  updating, it's worth a fresh report with Logcat around the freeze.
 - **Grid mode is choppy/stutters on some tiles.** Decoding 3-4 RTSP streams
   at once is real CPU/GPU load for a cheap box's hardware decoder. Switch to
   **Single feed (rotate through cameras)** instead.

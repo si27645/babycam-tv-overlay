@@ -336,6 +336,18 @@ class OverlayService : Service() {
                 if (playbackState == Player.STATE_READY) {
                     slot.retryAttempt = 0
                     slot.cell.badge.visibility = View.GONE
+                } else if (playbackState == Player.STATE_BUFFERING) {
+                    // RTSP over TCP can go quiet (camera hiccup, brief Wi-Fi drop, a socket left
+                    // half-open) without ExoPlayer ever raising onPlayerError - it just sits
+                    // buffering on a frozen frame forever. Catch that by force-reconnecting if
+                    // buffering hasn't resolved to READY within the timeout. Harmless to schedule
+                    // repeatedly: it only acts if this exact player instance is *still* stuck when
+                    // it fires, so a buffering blip that recovers on its own is a no-op.
+                    mainHandler.postDelayed({
+                        if (!isDestroyed && slot.player === exoPlayer && exoPlayer.playbackState != Player.STATE_READY) {
+                            scheduleReconnect(slot)
+                        }
+                    }, STALL_TIMEOUT_MS)
                 }
             }
 
@@ -674,5 +686,8 @@ class OverlayService : Service() {
         private const val CHANNEL_ID = "babycam_overlay_channel"
         private const val NOTIFICATION_ID = 42
         private const val MAX_GRID_CAMERAS = 4
+
+        /** How long a player may sit buffering with no progress before it's treated as stalled and force-reconnected. */
+        private const val STALL_TIMEOUT_MS = 15_000L
     }
 }
