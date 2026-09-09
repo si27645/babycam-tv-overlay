@@ -122,16 +122,27 @@ class SettingsStore(context: Context) {
         get() = prefs.getString(KEY_MQTT_TOPIC, "babycam/doorbell") ?: "babycam/doorbell"
         set(value) = prefs.edit().putString(KEY_MQTT_TOPIC, value.trim()).apply()
 
-    /** id of the CameraProfile to show when triggered - may be a camera not otherwise enabled. */
-    var doorbellCameraId: String
-        get() = prefs.getString(KEY_DOORBELL_CAMERA_ID, "") ?: ""
-        set(value) = prefs.edit().putString(KEY_DOORBELL_CAMERA_ID, value).apply()
+    /**
+     * ids of the CameraProfiles to show when triggered - may include cameras not otherwise
+     * enabled in the normal rotation/grid. One selected -> shown statically for the whole
+     * duration; several -> rotated between them, splitting the duration evenly.
+     */
+    var doorbellCameraIds: Set<String>
+        get() = (prefs.getString(KEY_DOORBELL_CAMERA_IDS, "") ?: "")
+            .split(",")
+            .map { it.trim() }
+            .filterTo(LinkedHashSet()) { it.isNotEmpty() }
+        set(value) = prefs.edit().putString(KEY_DOORBELL_CAMERA_IDS, value.joinToString(",")).apply()
 
     var doorbellDurationSeconds: Int
         get() = prefs.getInt(KEY_DOORBELL_DURATION, 20)
         set(value) = prefs.edit().putInt(KEY_DOORBELL_DURATION, value).apply()
 
-    fun doorbellCamera(): CameraProfile? = cameras.firstOrNull { it.id == doorbellCameraId }
+    /** [doorbellCameraIds] resolved against the current camera list, in that list's order. */
+    fun doorbellCameras(): List<CameraProfile> {
+        val ids = doorbellCameraIds
+        return cameras.filter { it.id in ids }
+    }
 
     companion object {
         private const val PREFS_NAME = "babycam_settings"
@@ -151,7 +162,7 @@ class SettingsStore(context: Context) {
         private const val KEY_MQTT_USERNAME = "mqtt_username"
         private const val KEY_MQTT_PASSWORD = "mqtt_password"
         private const val KEY_MQTT_TOPIC = "mqtt_topic"
-        private const val KEY_DOORBELL_CAMERA_ID = "doorbell_camera_id"
+        private const val KEY_DOORBELL_CAMERA_IDS = "doorbell_camera_ids"
         private const val KEY_DOORBELL_DURATION = "doorbell_duration_seconds"
     }
 }

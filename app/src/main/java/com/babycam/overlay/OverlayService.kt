@@ -72,15 +72,22 @@ class OverlayService : Service() {
 
     // ---- Doorbell trigger (MQTT) state -----------------------------------------------------
     private var mqttClient: MqttDoorbellClient? = null
-    /** The slot currently showing the doorbell camera, if a trigger is active right now. */
+    /**
+     * The slot currently showing the doorbell camera(s), if a trigger is active right now.
+     * Unified across both layout modes: in SINGLE_ROTATE it aliases slots[0] (like the
+     * GRID grid-already-full case aliases slots.last()); only the GRID extra-tile case is a
+     * genuinely separate slot never added to [slots].
+     */
     private var doorbellSlot: CameraSlot? = null
-    /** True if [doorbellSlot] is a temporarily-added extra grid tile; false if it replaced an existing one. */
+    /** True if [doorbellSlot] is a temporarily-added extra grid tile; false if it aliases an existing slot. */
     private var doorbellIsExtraTile = false
-    /** GRID mode, grid-already-full case: what was playing on the tile the doorbell took over. */
+    /** What was playing on [doorbellSlot] before the trigger started, so it can be restored afterwards. */
     private var replacedSlotProfile: CameraProfile? = null
-    /** SINGLE_ROTATE mode: what was playing before the trigger, so it can resume afterwards. */
-    private var preDoorbellSingleProfile: CameraProfile? = null
+    /** The (possibly single-camera) set being shown for the current trigger, and where in it we are. */
+    private var doorbellRotationQueue: List<CameraProfile> = emptyList()
+    private var doorbellRotationIndex = 0
     private var doorbellRevertRunnable: Runnable? = null
+    private var doorbellRotationRunnable: Runnable? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -331,16 +338,19 @@ class OverlayService : Service() {
         mainHandler.removeCallbacksAndMessages(null)
         slots.forEach { it.player?.release() }
         slots.clear()
-        // doorbellSlot either aliases one of the slots just released above (grid-full replace
-        // case) or is a separate extra tile never added to `slots` (needs releasing here).
+        // doorbellSlot either aliases one of the slots just released above (SINGLE_ROTATE, or
+        // GRID's grid-already-full case) or is a separate extra tile never added to `slots`
+        // (needs releasing here).
         if (doorbellIsExtraTile) {
             doorbellSlot?.player?.release()
         }
         doorbellSlot = null
         doorbellIsExtraTile = false
         replacedSlotProfile = null
-        preDoorbellSingleProfile = null
         doorbellRevertRunnable = null
+        doorbellRotationRunnable = null
+        doorbellRotationQueue = emptyList()
+        doorbellRotationIndex = 0
     }
 
     // ---- Doorbell trigger (MQTT) ------------------------------------------------------------
@@ -373,73 +383,90 @@ class OverlayService : Service() {
 
     private fun handleDoorbellTrigger() {
         if (isDestroyed || !overlayAttached) return
-        val profile = settings.doorbellCamera() ?: return
+        val profiles = settings.doorbellCameras()
+        if (profiles.isEmpty()) return
 
         doorbellRevertRunnable?.let { mainHandler.removeCallbacks(it) }
+        doorbellRotationRunnable?.let { mainHandler.removeCallbacks(it) }
+        doorbellRotationQueue = profiles
+        doorbellRotationIndex = 0
 
-        when (settings.layoutMode) {
-            LayoutMode.SINGLE_ROTATE -> {
-                val slot = slots.getOrNull(0) ?: return
-                if (preDoorbellSingleProfile == null) {
-                    preDoorbellSingleProfile = slot.profile
+        if (doorbellSlot == null) {
+            // Not currently active - claim a slot the same way regardless of layout mode:
+            // SINGLE_ROTATE aliases the one slot, GRID either adds a tile or (if already full)
+            // aliases the last tile - both "alias" cases remember what to restore afterward.
+            when (settings.layoutMode) {
+                LayoutMode.SINGLE_ROTATE -> {
+                    val slot = slots.getOrNull(0) ?: return
+                    replacedSlotProfile = slot.profile
                     mainHandler.removeCallbacks(rotationRunnable)
-                }
-                playCamera(slot, profile)
-            }
-
-            LayoutMode.GRID -> {
-                val active = doorbellSlot
-                if (active != null) {
-                    // Re-trigger while already showing - just replay to clear any error state.
-                    playCamera(active, profile)
-                } else if (slots.size < MAX_GRID_CAMERAS) {
-                    val cells = buildGridRows(slots.size + 1)
-                    slots.forEachIndexed { index, slot -> reattachSlot(slot, cells[index]) }
-                    val newSlot = CameraSlot(cells.last())
-                    doorbellSlot = newSlot
-                    doorbellIsExtraTile = true
-                    playCamera(newSlot, profile)
-                } else {
-                    val lastSlot = slots.last()
-                    replacedSlotProfile = lastSlot.profile
-                    doorbellSlot = lastSlot
+                    doorbellSlot = slot
                     doorbellIsExtraTile = false
-                    playCamera(lastSlot, profile)
+                }
+
+                LayoutMode.GRID -> {
+                    if (slots.size < MAX_GRID_CAMERAS) {
+                        val cells = buildGridRows(slots.size + 1)
+                        slots.forEachIndexed { index, slot -> reattachSlot(slot, cells[index]) }
+                        doorbellSlot = CameraSlot(cells.last())
+                        doorbellIsExtraTile = true
+                    } else {
+                        val lastSlot = slots.last()
+                        replacedSlotProfile = lastSlot.profile
+                        doorbellSlot = lastSlot
+                        doorbellIsExtraTile = false
+                    }
                 }
             }
         }
+        // Re-trigger while already active just restarts on the first camera and resets the
+        // countdown/rotation below, rather than stacking a second overlay.
+
+        doorbellSlot?.let { playCamera(it, profiles[0]) }
+        if (profiles.size > 1) scheduleDoorbellRotation()
 
         val revert = Runnable { revertDoorbell() }
         doorbellRevertRunnable = revert
         mainHandler.postDelayed(revert, settings.doorbellDurationSeconds * 1000L)
     }
 
+    /** Splits the trigger duration evenly across the selected doorbell cameras and cycles through them. */
+    private fun scheduleDoorbellRotation() {
+        val perCameraMs = (settings.doorbellDurationSeconds * 1000L / doorbellRotationQueue.size)
+            .coerceAtLeast(3_000L)
+        val runnable = Runnable { advanceDoorbellRotation() }
+        doorbellRotationRunnable = runnable
+        mainHandler.postDelayed(runnable, perCameraMs)
+    }
+
+    private fun advanceDoorbellRotation() {
+        if (isDestroyed || doorbellRotationQueue.size <= 1) return
+        val slot = doorbellSlot ?: return
+        doorbellRotationIndex = (doorbellRotationIndex + 1) % doorbellRotationQueue.size
+        playCamera(slot, doorbellRotationQueue[doorbellRotationIndex])
+        scheduleDoorbellRotation()
+    }
+
     private fun revertDoorbell() {
         doorbellRevertRunnable = null
-        when (settings.layoutMode) {
-            LayoutMode.SINGLE_ROTATE -> {
-                val prior = preDoorbellSingleProfile
-                preDoorbellSingleProfile = null
-                val slot = slots.getOrNull(0)
-                if (slot != null && prior != null) {
-                    playCamera(slot, prior)
-                }
-                if (rotationQueue.size > 1) scheduleRotation()
-            }
+        doorbellRotationRunnable?.let { mainHandler.removeCallbacks(it) }
+        doorbellRotationRunnable = null
+        doorbellRotationQueue = emptyList()
 
-            LayoutMode.GRID -> {
-                val slot = doorbellSlot ?: return
-                doorbellSlot = null
-                if (doorbellIsExtraTile) {
-                    doorbellIsExtraTile = false
-                    slot.player?.release()
-                    val cells = buildGridRows(slots.size)
-                    slots.forEachIndexed { index, s -> reattachSlot(s, cells[index]) }
-                } else {
-                    val prior = replacedSlotProfile
-                    replacedSlotProfile = null
-                    if (prior != null) playCamera(slot, prior)
-                }
+        val slot = doorbellSlot ?: return
+        doorbellSlot = null
+
+        if (doorbellIsExtraTile) {
+            doorbellIsExtraTile = false
+            slot.player?.release()
+            val cells = buildGridRows(slots.size)
+            slots.forEachIndexed { index, s -> reattachSlot(s, cells[index]) }
+        } else {
+            val prior = replacedSlotProfile
+            replacedSlotProfile = null
+            if (prior != null) playCamera(slot, prior)
+            if (settings.layoutMode == LayoutMode.SINGLE_ROTATE && rotationQueue.size > 1) {
+                scheduleRotation()
             }
         }
     }

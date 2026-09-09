@@ -64,10 +64,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var inputMqttPassword: EditText
     private lateinit var inputMqttTopic: EditText
     private lateinit var mqttTestStatus: TextView
-    private lateinit var groupDoorbellCamera: RadioGroup
+    private lateinit var doorbellCameraContainer: LinearLayout
     private lateinit var groupDoorbellDuration: RadioGroup
-    /** Kept in sync with what's currently shown in groupDoorbellCamera, so a checked radio id maps back to a CameraProfile. */
-    private var doorbellPickerCameras: List<CameraProfile> = emptyList()
+    /** One checkbox per saved camera, multi-select: pick one for a static feed, several to rotate through them. */
+    private var doorbellCameraCheckboxes: List<Pair<CameraProfile, CheckBox>> = emptyList()
 
     /** True once the camera list, layout mode, or rotation interval changed since the overlay was last (re)started. */
     private var camerasDirty = false
@@ -127,7 +127,7 @@ class MainActivity : AppCompatActivity() {
         inputMqttPassword = findViewById(R.id.input_mqtt_password)
         inputMqttTopic = findViewById(R.id.input_mqtt_topic)
         mqttTestStatus = findViewById(R.id.mqtt_test_status)
-        groupDoorbellCamera = findViewById(R.id.group_doorbell_camera)
+        doorbellCameraContainer = findViewById(R.id.group_doorbell_camera)
         groupDoorbellDuration = findViewById(R.id.group_doorbell_duration)
     }
 
@@ -174,24 +174,38 @@ class MainActivity : AppCompatActivity() {
         camerasDirty = false
     }
 
-    /** Rebuilds the doorbell-camera RadioGroup from the current camera list and restores the saved selection. */
+    /**
+     * Rebuilds the doorbell-camera checkbox list from the current camera list and restores the
+     * saved selection. Multi-select: one checked -> shown statically when triggered, several ->
+     * rotated through for the trigger duration.
+     */
     private fun refreshDoorbellCameraPicker() {
-        groupDoorbellCamera.removeAllViews()
-        doorbellPickerCameras = settings.cameras
-        if (doorbellPickerCameras.isEmpty()) {
-            groupDoorbellCamera.addView(TextView(this).apply {
+        doorbellCameraContainer.removeAllViews()
+        val cameras = settings.cameras
+        if (cameras.isEmpty()) {
+            doorbellCameraContainer.addView(TextView(this).apply {
                 text = getString(R.string.no_cameras_for_doorbell)
                 setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
                 textSize = 13f
             })
+            doorbellCameraCheckboxes = emptyList()
             return
         }
-        doorbellPickerCameras.forEachIndexed { index, profile ->
-            groupDoorbellCamera.addView(radioButtonFor(profile.name.ifBlank { getString(R.string.unnamed_camera) }, index))
+        val savedIds = settings.doorbellCameraIds
+        doorbellCameraCheckboxes = cameras.map { profile ->
+            val checkbox = CheckBox(this).apply {
+                text = profile.name.ifBlank { getString(R.string.unnamed_camera) }
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                isChecked = profile.id in savedIds
+            }
+            doorbellCameraContainer.addView(checkbox)
+            profile to checkbox
         }
-        val savedIndex = doorbellPickerCameras.indexOfFirst { it.id == settings.doorbellCameraId }
-        if (savedIndex >= 0) groupDoorbellCamera.check(savedIndex)
     }
+
+    private fun selectedDoorbellCameraIds(): Set<String> =
+        doorbellCameraCheckboxes.filter { (_, checkbox) -> checkbox.isChecked }
+            .mapTo(LinkedHashSet()) { (profile, _) -> profile.id }
 
     private fun wireActions() {
         findViewById<Button>(R.id.btn_add_camera).setOnClickListener { showCameraDialog(null) }
@@ -556,10 +570,10 @@ class MainActivity : AppCompatActivity() {
         val newMqttUsername = inputMqttUsername.text.toString()
         val newMqttPassword = inputMqttPassword.text.toString()
         val newMqttTopic = inputMqttTopic.text.toString().trim().ifBlank { "babycam/doorbell" }
-        val newDoorbellCameraId = doorbellPickerCameras.getOrNull(groupDoorbellCamera.checkedRadioButtonId)?.id ?: ""
+        val newDoorbellCameraIds = selectedDoorbellCameraIds()
         val newDoorbellDuration = DOORBELL_DURATION_OPTIONS[groupDoorbellDuration.checkedRadioButtonId.coerceAtLeast(0)]
 
-        if (newMqttEnabled && (newMqttHost.isBlank() || newDoorbellCameraId.isBlank())) {
+        if (newMqttEnabled && (newMqttHost.isBlank() || newDoorbellCameraIds.isEmpty())) {
             overlayStatusText.text = getString(R.string.status_doorbell_incomplete)
             return
         }
@@ -571,7 +585,7 @@ class MainActivity : AppCompatActivity() {
             newMqttUsername != settings.mqttUsername ||
             newMqttPassword != settings.mqttPassword ||
             newMqttTopic != settings.mqttTopic ||
-            newDoorbellCameraId != settings.doorbellCameraId
+            newDoorbellCameraIds != settings.doorbellCameraIds
 
         settings.layoutMode = newLayoutMode
         settings.rotationIntervalSeconds = newRotationInterval
@@ -582,7 +596,7 @@ class MainActivity : AppCompatActivity() {
         settings.mqttUsername = newMqttUsername
         settings.mqttPassword = newMqttPassword
         settings.mqttTopic = newMqttTopic
-        settings.doorbellCameraId = newDoorbellCameraId
+        settings.doorbellCameraIds = newDoorbellCameraIds
         settings.doorbellDurationSeconds = newDoorbellDuration
 
         if (!canDrawOverlaysCompat(this)) {

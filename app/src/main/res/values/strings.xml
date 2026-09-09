@@ -78,7 +78,7 @@
     <string name="mqtt_test_success">✓ Connected to the broker</string>
     <string name="mqtt_test_failed">✗ Failed: %1$s</string>
     <string name="mqtt_test_timeout">✗ Timed out waiting for the broker</string>
-    <string name="label_doorbell_camera">Camera to show when triggered</string>
+    <string name="label_doorbell_camera">Cameras to show when triggered (pick one, or several to rotate through)</string>
     <string name="no_cameras_for_doorbell">Add a camera first, then pick it here.</string>
     <string name="label_doorbell_duration">How long to show it</string>
     <string name="status_doorbell_incomplete">Doorbell trigger needs a broker host and a camera picked</string>

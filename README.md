@@ -93,18 +93,26 @@ automation:
           payload: "ring"
 ```
 
-Pick which saved camera should show (it doesn't need to be one of the
-cameras already enabled in the regular rotation/grid — you can keep a
-doorbell camera out of normal view and only have it pop up on a ring), and
-how long it stays up (10-60s). What actually happens depends on the layout
+Pick which saved camera(s) should show — checkboxes, not a single choice,
+and they don't need to be cameras already enabled in the regular
+rotation/grid (you can keep a doorbell camera out of normal view and only
+have it pop up on a ring) — and how long the trigger stays up (10-60s):
+
+- **Pick one** and it's shown statically for the whole duration.
+- **Pick several** and the overlay rotates through them, splitting the
+  duration evenly (e.g. two cameras and a 20s duration means 10s each) —
+  useful if you've got a front and back door and want either ring to cycle
+  through both.
+
+What actually happens to the rest of the overlay depends on the layout
 mode already in use:
 
-- **Single feed** — the overlay temporarily switches to the doorbell
-  camera, then resumes whatever was playing (and rotating) before.
-- **Grid** — the doorbell camera is added as an extra tile alongside
-  what's already showing (up to the 4-tile cap; if the grid is already
-  full, it temporarily takes over the last tile instead), then that tile
-  reverts afterward.
+- **Single feed** — temporarily switches to the doorbell camera(s), then
+  resumes whatever was playing (and rotating) before.
+- **Grid** — the doorbell camera(s) take over one tile: added as an extra
+  tile alongside what's already showing (up to the 4-tile cap), or if the
+  grid is already full, temporarily taking over the last tile instead —
+  either way, that tile reverts afterward.
 
 A re-trigger while one is already active just resets the countdown rather
 than stacking. Use **Test broker connection** to confirm the app can reach

@@ -191,7 +191,7 @@
             android:textSize="13sp" />
 
         <TextView style="@style/FieldLabel" android:text="@string/label_doorbell_camera" />
-        <RadioGroup
+        <LinearLayout
             android:id="@+id/group_doorbell_camera"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
