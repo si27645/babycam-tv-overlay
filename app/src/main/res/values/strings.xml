@@ -62,7 +62,7 @@
     <string name="label_autostart">Start overlay automatically on boot</string>
 
     <string name="section_doorbell">Doorbell trigger</string>
-    <string name="doorbell_explainer">Have Home Assistant publish an MQTT message when the doorbell rings, and the doorbell camera pops up automatically for a few seconds — in its own floating window, alongside whatever the main overlay is already showing.</string>
+    <string name="doorbell_explainer">Have Home Assistant publish an MQTT message when the doorbell rings, and the doorbell camera pops up automatically for a few seconds.</string>
     <string name="label_mqtt_enabled">Enable doorbell trigger</string>
     <string name="label_mqtt_host">Broker host</string>
     <string name="hint_mqtt_host">192.168.1.10</string>
@@ -81,8 +81,6 @@
     <string name="label_doorbell_camera">Cameras to show when triggered (pick one, or several to rotate through)</string>
     <string name="no_cameras_for_doorbell">Add a camera first, then pick it here.</string>
     <string name="label_doorbell_duration">How long to show it</string>
-    <string name="label_doorbell_position">Doorbell window position</string>
-    <string name="label_doorbell_size">Doorbell window size</string>
     <string name="status_doorbell_incomplete">Doorbell trigger needs a broker host and a camera picked</string>
 
     <string name="section_permissions">Permissions</string>

@@ -104,14 +104,30 @@ have it pop up on a ring) — and how long the trigger stays up (10-60s):
   useful if you've got a front and back door and want either ring to cycle
   through both.
 
-A trigger opens its **own separate floating window** with its own
-position and size (set those two further down) — it never touches or
-replaces whatever the main overlay is already showing, in either layout
-mode, so your normal view keeps playing undisturbed the whole time. Pick a
-position/size for it that doesn't overlap the main overlay's own spot. A
-re-trigger while one is already showing just resets the countdown rather
-than opening a second one. Use **Test broker connection** to confirm the
-app can reach your broker before saving.
+A trigger temporarily takes over the existing overlay rather than opening
+a second independent window: in **single feed** mode it swaps the one
+slot to the doorbell camera(s), then resumes whatever was playing (and
+rotating) before; in **grid** mode it's added as an extra tile alongside
+what's already showing (up to the 4-tile cap), or takes over the last
+tile if the grid is already full — either way, that reverts afterward.
+A re-trigger while one is already active just resets the countdown rather
+than stacking. Use **Test broker connection** to confirm the app can reach
+your broker before saving.
+
+This is a deliberate hardware-driven choice, not the original design: an
+earlier version of this feature opened a genuinely separate second
+floating window so the doorbell camera could show *alongside* the main
+one without disturbing it. On real (weak/older) TV box hardware, that
+turned out to not work reliably — the box's GPU/compositor couldn't
+render two independently-decoding video surfaces at once; the decoder
+itself succeeded, but the second window's renderer stalled badly enough
+(an 800ms+ single frame, logged as `Davey!` under `OpenGLRenderer`) that
+it never produced a visible picture, while the main overlay kept working
+fine. Takeover only ever needs one concurrent video pipeline, which this
+class of hardware can actually handle. If you're building on stronger
+hardware and want the two-window behavior back, the previous
+implementation is in git history (look for the commit titled "Doorbell
+trigger: separate floating window, not a takeover" and its revert).
 
 ## Requirements
 

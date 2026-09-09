@@ -66,8 +66,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var mqttTestStatus: TextView
     private lateinit var doorbellCameraContainer: LinearLayout
     private lateinit var groupDoorbellDuration: RadioGroup
-    private lateinit var groupDoorbellPosition: RadioGroup
-    private lateinit var groupDoorbellSize: RadioGroup
     /** One checkbox per saved camera, multi-select: pick one for a static feed, several to rotate through them. */
     private var doorbellCameraCheckboxes: List<Pair<CameraProfile, CheckBox>> = emptyList()
 
@@ -131,8 +129,6 @@ class MainActivity : AppCompatActivity() {
         mqttTestStatus = findViewById(R.id.mqtt_test_status)
         doorbellCameraContainer = findViewById(R.id.group_doorbell_camera)
         groupDoorbellDuration = findViewById(R.id.group_doorbell_duration)
-        groupDoorbellPosition = findViewById(R.id.group_doorbell_position)
-        groupDoorbellSize = findViewById(R.id.group_doorbell_size)
     }
 
     /** Builds the option RadioGroups from enums/constants so those stay the single source of truth. */
@@ -147,8 +143,6 @@ class MainActivity : AppCompatActivity() {
         DOORBELL_DURATION_OPTIONS.forEachIndexed { index, seconds ->
             groupDoorbellDuration.addView(radioButtonFor(getString(R.string.rotation_interval_option, seconds), index))
         }
-        OverlayPosition.entries.forEach { position -> groupDoorbellPosition.addView(radioButtonFor(position.label, position.ordinal)) }
-        OverlaySize.entries.forEach { size -> groupDoorbellSize.addView(radioButtonFor(size.label, size.ordinal)) }
     }
 
     private fun radioButtonFor(label: String, id: Int): RadioButton = RadioButton(this).apply {
@@ -175,8 +169,6 @@ class MainActivity : AppCompatActivity() {
         inputMqttPassword.setText(settings.mqttPassword)
         inputMqttTopic.setText(settings.mqttTopic)
         groupDoorbellDuration.check(DOORBELL_DURATION_OPTIONS.indexOf(settings.doorbellDurationSeconds).coerceAtLeast(0))
-        groupDoorbellPosition.check(settings.doorbellPosition.ordinal)
-        groupDoorbellSize.check(settings.doorbellSize.ordinal)
 
         refreshCameraList()
         camerasDirty = false
@@ -598,8 +590,6 @@ class MainActivity : AppCompatActivity() {
         val newMqttTopic = inputMqttTopic.text.toString().trim().ifBlank { "babycam/doorbell" }
         val newDoorbellCameraIds = selectedDoorbellCameraIds()
         val newDoorbellDuration = DOORBELL_DURATION_OPTIONS[groupDoorbellDuration.checkedRadioButtonId.coerceAtLeast(0)]
-        val newDoorbellPosition = OverlayPosition.entries[groupDoorbellPosition.checkedRadioButtonId.coerceAtLeast(0)]
-        val newDoorbellSize = OverlaySize.entries[groupDoorbellSize.checkedRadioButtonId.coerceAtLeast(0)]
 
         if (newMqttEnabled && (newMqttHost.isBlank() || newDoorbellCameraIds.isEmpty())) {
             overlayStatusText.text = getString(R.string.status_doorbell_incomplete)
@@ -613,9 +603,7 @@ class MainActivity : AppCompatActivity() {
             newMqttUsername != settings.mqttUsername ||
             newMqttPassword != settings.mqttPassword ||
             newMqttTopic != settings.mqttTopic ||
-            newDoorbellCameraIds != settings.doorbellCameraIds ||
-            newDoorbellPosition != settings.doorbellPosition ||
-            newDoorbellSize != settings.doorbellSize
+            newDoorbellCameraIds != settings.doorbellCameraIds
 
         settings.layoutMode = newLayoutMode
         settings.rotationIntervalSeconds = newRotationInterval
@@ -628,8 +616,6 @@ class MainActivity : AppCompatActivity() {
         settings.mqttTopic = newMqttTopic
         settings.doorbellCameraIds = newDoorbellCameraIds
         settings.doorbellDurationSeconds = newDoorbellDuration
-        settings.doorbellPosition = newDoorbellPosition
-        settings.doorbellSize = newDoorbellSize
 
         if (!canDrawOverlaysCompat(this)) {
             requestOverlayPermission()
