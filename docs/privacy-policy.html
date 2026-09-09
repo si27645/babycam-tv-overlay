@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BabyCam Overlay — Privacy Policy</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+  :root{
+    --bg:#F6F8F9;
+    --surface:#FFFFFF;
+    --text:#16202B;
+    --text-2:#57697A;
+    --accent:#128A7D;
+    --accent-soft:#DFF3F0;
+    --rule:#E1E7EA;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0F1720;
+      --surface:#16212C;
+      --text:#F2F5F6;
+      --text-2:#94A3AF;
+      --accent:#4FD1C5;
+      --accent-soft:#1B2E2D;
+      --rule:#223244;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0F1720;
+    --surface:#16212C;
+    --text:#F2F5F6;
+    --text-2:#94A3AF;
+    --accent:#4FD1C5;
+    --accent-soft:#1B2E2D;
+    --rule:#223244;
+  }
+
+  *{box-sizing:border-box;}
+  html{background:var(--bg);}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Sans', -apple-system, Helvetica, Arial, sans-serif;
+    line-height:1.65;
+  }
+  .page{
+    max-width:700px;
+    margin:0 auto;
+    padding:72px 28px 96px;
+  }
+
+  header{
+    display:flex;
+    align-items:center;
+    gap:18px;
+    margin-bottom:44px;
+  }
+  .mark{flex-shrink:0;}
+  .mark circle.outer{fill:none;stroke:var(--accent);stroke-width:6;}
+  .mark circle.inner{fill:var(--surface);}
+  .mark circle.pupil{fill:var(--text);opacity:.15;}
+  .kicker{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--text-2);
+    margin:0 0 6px 0;
+  }
+  h1{
+    font-family:'Fraunces', Georgia, serif;
+    font-weight:600;
+    font-size:38px;
+    line-height:1.1;
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  .updated{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    color:var(--text-2);
+    margin:28px 0 0 0;
+  }
+
+  .lede{
+    font-size:19px;
+    line-height:1.6;
+    color:var(--text);
+    border-left:3px solid var(--accent);
+    padding-left:20px;
+    margin:0 0 56px 0;
+  }
+  .lede strong{color:var(--accent);font-weight:600;}
+
+  section{
+    padding:36px 0;
+    border-top:1px solid var(--rule);
+  }
+  section:first-of-type{border-top:1px solid var(--rule);}
+
+  h2{
+    font-family:'Fraunces', Georgia, serif;
+    font-weight:600;
+    font-size:23px;
+    margin:0 0 16px 0;
+    letter-spacing:-0.005em;
+    text-wrap:balance;
+  }
+  p{
+    margin:0 0 14px 0;
+    max-width:62ch;
+    color:var(--text);
+  }
+  p:last-child{margin-bottom:0;}
+  .muted{color:var(--text-2);}
+
+  ul{margin:0 0 14px 0;padding-left:0;list-style:none;max-width:62ch;}
+  li{
+    position:relative;
+    padding-left:22px;
+    margin-bottom:10px;
+  }
+  li::before{
+    content:"";
+    position:absolute;
+    left:0; top:9px;
+    width:7px; height:7px;
+    border-radius:50%;
+    border:1.5px solid var(--accent);
+  }
+
+  code, .perm{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13.5px;
+    background:var(--accent-soft);
+    color:var(--text);
+    padding:1px 6px;
+    border-radius:4px;
+    white-space:nowrap;
+  }
+
+  .fact-row{
+    display:flex;
+    gap:14px;
+    align-items:baseline;
+    flex-wrap:wrap;
+    padding:14px 0;
+    border-bottom:1px solid var(--rule);
+  }
+  .fact-row:last-child{border-bottom:none;}
+  .fact-q{
+    font-weight:600;
+    min-width:230px;
+    flex-shrink:0;
+  }
+  .fact-a{color:var(--text-2);}
+  .fact-a strong{color:var(--accent);font-weight:600;}
+
+  footer{
+    margin-top:56px;
+    padding-top:32px;
+    border-top:1px solid var(--rule);
+    font-size:14px;
+    color:var(--text-2);
+  }
+  footer a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent;}
+  footer a:hover{border-bottom-color:var(--accent);}
+  footer a:focus-visible, a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <svg class="mark" width="52" height="52" viewBox="0 0 52 52" aria-hidden="true">
+      <circle class="outer" cx="26" cy="26" r="18"/>
+      <circle class="inner" cx="26" cy="26" r="12"/>
+      <circle class="pupil" cx="26" cy="26" r="7"/>
+    </svg>
+    <div>
+      <p class="kicker">BabyCam Overlay</p>
+      <h1>Privacy Policy</h1>
+    </div>
+  </header>
+
+  <p class="lede">
+    The short version: <strong>BabyCam Overlay collects nothing.</strong> No account,
+    no analytics, no ads, no server of ours in the loop at all. Your camera's video
+    goes from your camera to your TV box over your own local network &mdash; full stop.
+  </p>
+
+  <section>
+    <h2>What this app does</h2>
+    <p>
+      BabyCam Overlay is an Android TV app. You give it the network address of a
+      camera you already own &mdash; typically an RTSP-capable IP camera or NVR &mdash;
+      and it draws that camera's live video in a small window that floats on top of
+      whatever else is on the TV.
+    </p>
+    <p class="muted">
+      That's the entire feature set. There is no cloud service behind this app, no
+      companion account, and no way for the app to work without a camera already
+      present on your own network.
+    </p>
+  </section>
+
+  <section>
+    <h2>Data we collect</h2>
+    <p><strong>None.</strong> Specifically:</p>
+    <ul>
+      <li>We don't operate any server that this app talks to.</li>
+      <li>We don't use analytics, crash reporting, or advertising SDKs.</li>
+      <li>We don't ask for an account, an email address, or any personal information.</li>
+      <li>We don't know this app is installed on your device, and have no way to find out.</li>
+    </ul>
+    <p>
+      The camera URL and login you enter are saved only in the app's private
+      storage on your own TV box, using Android's standard app-preferences
+      mechanism. That data never leaves the device, except in the one place it's
+      meant to go: directly to your camera, over your local network, to fetch the
+      video stream you asked for.
+    </p>
+  </section>
+
+  <section>
+    <h2>Permissions this app uses, and why</h2>
+    <div class="fact-row">
+      <div class="fact-q"><span class="perm">Display over other apps</span></div>
+      <div class="fact-a">The app's entire purpose &mdash; showing the camera feed on top of everything else. Nothing works without it.</div>
+    </div>
+    <div class="fact-row">
+      <div class="fact-q"><span class="perm">Foreground service / notification</span></div>
+      <div class="fact-a">Keeps the overlay running reliably while you use other apps, as Android requires for any background video playback.</div>
+    </div>
+    <div class="fact-row">
+      <div class="fact-q"><span class="perm">Network / Wi-Fi state</span></div>
+      <div class="fact-a">Used to connect to your camera's stream, and for the optional on-device scan that helps find ONVIF-capable cameras on your network.</div>
+    </div>
+    <div class="fact-row">
+      <div class="fact-q"><span class="perm">Run at startup</span></div>
+      <div class="fact-a">Only if you turn on "start automatically on boot," so the overlay comes back after a power cut without you doing anything.</div>
+    </div>
+    <p class="muted" style="margin-top:20px;">
+      Note that this app does not use your TV box's own camera or microphone
+      &mdash; it plays a video stream from a separate network camera that you
+      configure yourself.
+    </p>
+  </section>
+
+  <section>
+    <h2>Children's privacy</h2>
+    <p>
+      BabyCam Overlay is a tool used <em>by</em> a parent or caregiver, not an app
+      aimed at or interacted with by children. It is not directed at children, and
+      it doesn't knowingly collect information from anyone, child or adult, because
+      it doesn't collect information at all.
+    </p>
+  </section>
+
+  <section>
+    <h2>Deleting your data</h2>
+    <p>
+      Since everything is stored only on your own device, deleting it is entirely
+      in your hands: clearing the app's storage or uninstalling BabyCam Overlay
+      from your TV box removes the saved camera list and settings completely.
+      There is nothing stored anywhere else to delete.
+    </p>
+  </section>
+
+  <section>
+    <h2>Changes to this policy</h2>
+    <p>
+      If this policy ever changes, the update will be posted at this same address,
+      with the date below revised accordingly.
+    </p>
+  </section>
+
+  <footer>
+    <p>Questions about this app or this policy? Open an issue on the project's
+    <a href="https://github.com/si27645/babycam-tv-overlay" target="_blank" rel="noopener">GitHub repository</a>.</p>
+  </footer>
+
+  <p class="updated">Last updated September 9, 2026</p>
+
+</div>
+</body>
+</html>

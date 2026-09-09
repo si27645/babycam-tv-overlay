@@ -11,3 +11,10 @@
 *.aab
 /app/build
 /app/release
+
+# Release signing secrets - never commit these. Back them up somewhere safe outside
+# git (a password manager, encrypted drive, etc.) - losing them means you can never
+# publish an update to an app already live on the Play Store under this signature.
+/keystore.properties
+*.jks
+*.keystore

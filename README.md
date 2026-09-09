@@ -92,9 +92,58 @@ builds clean with AGP 8.5.2 / Gradle 8.13 / JDK 17, and `lintDebug` passes
 with no errors (only informational warnings — dependency-update notices,
 accessibility/autofill hints, etc.).
 
-For a release build to actually keep on a device long-term, sign it (Android
-Studio → Build → Generate Signed Bundle/APK) rather than shipping the debug
-build.
+## Release signing
+
+Play Store submissions need a signed Android App Bundle, not the debug APK.
+Signing credentials live in a git-ignored `keystore.properties` (pointing at
+a git-ignored `.jks` keystore file) at the project root — neither is
+committed, since anyone with them could publish updates to the app under
+your identity.
+
+If you don't already have these two files (a fresh clone won't), generate
+them once:
+
+```bash
+keytool -genkeypair -alias babycam-overlay -keyalg RSA -keysize 4096 \
+  -validity 10000 -keystore babycam-overlay-release.jks
+
+cat > keystore.properties <<EOF
+storeFile=../babycam-overlay-release.jks
+storePassword=<the password you just set>
+keyAlias=babycam-overlay
+keyPassword=<the same password - PKCS12 keystores require store and key passwords to match>
+EOF
+```
+
+Then build the signed bundle:
+
+```bash
+./gradlew bundleRelease
+```
+
+The signed `.aab` lands at `app/build/outputs/bundle/release/app-release.aab`
+— that's what gets uploaded to Play Console. `./gradlew assembleRelease`
+also produces a signed `.apk` at `app/build/outputs/apk/release/` if you want
+to sideload/test the release build directly.
+
+**Back up `babycam-overlay-release.jks` and the passwords in
+`keystore.properties` somewhere safe outside git** (a password manager, an
+encrypted drive). If you lose them, there is no way to publish an update to
+an app already live under this signature — Google can't reset this for you.
+
+## Publishing to the Play Store
+
+`STORE_LISTING.md` has the listing copy (short/full description, content
+rating and data-safety questionnaire answers) ready to paste into Play
+Console, and `store/` has the icon, feature graphic, TV banner, and
+screenshots. `docs/privacy-policy.html` is hosted via GitHub Pages at
+https://si27645.github.io/babycam-tv-overlay/privacy-policy.html — edit that
+file and push to update it, the URL stays the same.
+
+Publishing itself has to happen from your own Play Console account — Google
+requires the account holder to personally accept the developer agreement and
+complete the app's policy declarations, so there's no way to do this step
+from outside the console.
 
 ## Installing on a TV box
 
