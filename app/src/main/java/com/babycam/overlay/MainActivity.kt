@@ -3,6 +3,7 @@
 package com.babycam.overlay
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -23,6 +24,7 @@ import android.widget.RadioButton
 import android.widget.RadioGroup
 import androidx.appcompat.widget.SwitchCompat
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -358,7 +360,24 @@ class MainActivity : AppCompatActivity() {
 
     private fun requestOverlayPermission() {
         val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
-        overlayPermissionLauncher.launch(intent)
+        try {
+            overlayPermissionLauncher.launch(intent)
+        } catch (e: ActivityNotFoundException) {
+            // Some Android TV builds (stock Mi Box included) don't ship a screen for this
+            // intent at all. Fall back to the generic app-details screen, where the
+            // permission is sometimes reachable under Permissions/Advanced instead.
+            openAppDetailsAsOverlayPermissionFallback()
+        }
+    }
+
+    private fun openAppDetailsAsOverlayPermissionFallback() {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+        try {
+            overlayPermissionLauncher.launch(intent)
+            Toast.makeText(this, R.string.overlay_permission_fallback_hint, Toast.LENGTH_LONG).show()
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(this, R.string.overlay_permission_unavailable, Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun requestNotificationPermission() {

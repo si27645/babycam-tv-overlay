@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A single camera tile's video surface, inflated at runtime by OverlayService (one per
+  grid cell / the single rotating slot).
+
+  surface_type is deliberately texture_view, not the PlayerView default of surface_view:
+  a SurfaceView's content is composited by many TV chipsets on a dedicated hardware video
+  overlay plane that ignores normal Android window z-order entirely, so another app's own
+  SurfaceView-backed video (e.g. a live-TV app) can visually win over ours even though our
+  TYPE_APPLICATION_OVERLAY window is logically on top. A TextureView renders through the
+  ordinary GPU-composited layer instead, so it reliably respects window z-order against
+  other apps' video - at the cost of a bit more GPU/CPU overhead, which is a fine trade for
+  a small floating preview window.
+-->
+<androidx.media3.ui.PlayerView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    app:resize_mode="fit"
+    app:show_buffering="never"
+    app:surface_type="texture_view"
+    app:use_controller="false" />

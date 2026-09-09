@@ -64,6 +64,8 @@
     <string name="section_permissions">Permissions</string>
     <string name="label_overlay_permission">Display over other apps</string>
     <string name="btn_grant_overlay_permission">Grant overlay permission</string>
+    <string name="overlay_permission_fallback_hint">This TV doesn\'t have a direct screen for that — look for "Display over other apps" or "Draw over other apps" in the app permissions screen that just opened.</string>
+    <string name="overlay_permission_unavailable">Couldn\'t open any permissions screen on this device. Check your TV box\'s Settings app for BabyCam Overlay\'s permissions manually.</string>
     <string name="label_notification_permission">Notifications (required on Android 13+ to keep the overlay alive)</string>
     <string name="btn_grant_notification_permission">Grant notification permission</string>
     <string name="status_granted">✓ Granted</string>

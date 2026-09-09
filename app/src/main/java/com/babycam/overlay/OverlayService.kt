@@ -27,7 +27,6 @@ import androidx.core.app.NotificationCompat
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 
 /**
@@ -236,11 +235,10 @@ class OverlayService : Service() {
 
     private fun buildCell(): CameraCell {
         val container = FrameLayout(this)
-        val playerView = PlayerView(this).apply {
-            useController = false
-            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-            layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-        }
+        // Inflated from XML (rather than `PlayerView(this)`) specifically to pick up
+        // surface_type="texture_view" - see overlay_player_cell.xml for why.
+        val playerView = LayoutInflater.from(this)
+            .inflate(R.layout.overlay_player_cell, container, false) as PlayerView
         val badge = TextView(this).apply {
             text = getString(R.string.overlay_reconnecting)
             setTextColor(Color.WHITE)
