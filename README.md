@@ -21,6 +21,8 @@ box — a baby monitor overlay for the TV.
 - **OnvifDiscovery** is a small hand-rolled WS-Discovery + ONVIF SOAP client
   (no extra library) used from the "Add camera" dialog to find cameras on the
   LAN and, best-effort, resolve their actual RTSP stream URL.
+- **MqttDoorbellClient** subscribes (only) to an MQTT topic so a Home
+  Assistant automation can trigger a temporary doorbell-camera overlay.
 
 ### Multiple cameras: single-feed rotation or a grid
 
@@ -67,6 +69,46 @@ username/password you've typed in. Vendor ONVIF implementations are
 notoriously inconsistent, so this step can legitimately fail on some
 cameras — when it does, the dialog fills in the camera's IP with a common
 default RTSP port so you can finish the path by hand instead.
+
+### Doorbell trigger (Home Assistant via MQTT)
+
+Under **Doorbell trigger**, enable it, point it at your MQTT broker (host,
+port, optional username/password/TLS), and pick a topic — the app only ever
+*subscribes* to that topic, it never publishes anything and never runs a
+broker of its own. Have a Home Assistant automation publish to that same
+topic when the doorbell fires (the message content itself is ignored — any
+message on the topic counts as a trigger):
+
+```yaml
+automation:
+  - alias: Doorbell -> BabyCam overlay
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.front_door_doorbell
+        to: "on"
+    action:
+      - service: mqtt.publish
+        data:
+          topic: babycam/doorbell
+          payload: "ring"
+```
+
+Pick which saved camera should show (it doesn't need to be one of the
+cameras already enabled in the regular rotation/grid — you can keep a
+doorbell camera out of normal view and only have it pop up on a ring), and
+how long it stays up (10-60s). What actually happens depends on the layout
+mode already in use:
+
+- **Single feed** — the overlay temporarily switches to the doorbell
+  camera, then resumes whatever was playing (and rotating) before.
+- **Grid** — the doorbell camera is added as an extra tile alongside
+  what's already showing (up to the 4-tile cap; if the grid is already
+  full, it temporarily takes over the last tile instead), then that tile
+  reverts afterward.
+
+A re-trigger while one is already active just resets the countdown rather
+than stacking. Use **Test broker connection** to confirm the app can reach
+your broker before saving.
 
 ## Requirements
 
@@ -228,17 +270,24 @@ file manager once).
 - **Grid mode is choppy/stutters on some tiles.** Decoding 3-4 RTSP streams
   at once is real CPU/GPU load for a cheap box's hardware decoder. Switch to
   **Single feed (rotate through cameras)** instead.
+- **Doorbell trigger never fires.** Confirm **Test broker connection**
+  succeeds first. If it does but triggering still doesn't work, check the
+  topic matches exactly on both sides (case-sensitive), and that the HA
+  automation is actually publishing (Developer Tools → MQTT → Listen to a
+  topic, in Home Assistant, is the fastest way to confirm the message is
+  really being sent).
 
 ## Project layout
 
 ```
 app/src/main/java/com/babycam/overlay/
   MainActivity.kt        control panel UI: camera list CRUD, appearance, permissions
-  OverlayService.kt       foreground service, WindowManager overlay, N camera slots + reconnect/rotation
+  OverlayService.kt       foreground service, WindowManager overlay, N camera slots + reconnect/rotation, doorbell trigger
   OnvifDiscovery.kt        WS-Discovery probe + best-effort ONVIF SOAP client (no extra library)
+  MqttDoorbellClient.kt    thin Eclipse Paho wrapper - subscribes only, no broker/publishing
   CameraProfile.kt         one saved camera (name/url/credentials/enabled) + JSON (de)serialization
   BootReceiver.kt          restarts the overlay after reboot if auto-start is on
-  SettingsStore.kt         SharedPreferences-backed settings (camera list, layout, flags)
+  SettingsStore.kt         SharedPreferences-backed settings (camera list, layout, flags, MQTT/doorbell)
   RtspPlayerFactory.kt     shared ExoPlayer/RTSP MediaSource construction
   Util.kt                  small shared helpers (dp conversion, pre-23-safe overlay-permission check)
 app/src/main/res/

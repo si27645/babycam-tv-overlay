@@ -90,6 +90,49 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean(KEY_OVERLAY_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_OVERLAY_ENABLED, value).apply()
 
+    // ---- Doorbell trigger (MQTT) --------------------------------------------------------
+
+    /** Whether the app should connect to an MQTT broker and react to doorbell messages at all. */
+    var mqttEnabled: Boolean
+        get() = prefs.getBoolean(KEY_MQTT_ENABLED, false)
+        set(value) = prefs.edit().putBoolean(KEY_MQTT_ENABLED, value).apply()
+
+    var mqttHost: String
+        get() = prefs.getString(KEY_MQTT_HOST, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_MQTT_HOST, value.trim()).apply()
+
+    var mqttPort: Int
+        get() = prefs.getInt(KEY_MQTT_PORT, 1883)
+        set(value) = prefs.edit().putInt(KEY_MQTT_PORT, value).apply()
+
+    var mqttUseTls: Boolean
+        get() = prefs.getBoolean(KEY_MQTT_TLS, false)
+        set(value) = prefs.edit().putBoolean(KEY_MQTT_TLS, value).apply()
+
+    var mqttUsername: String
+        get() = prefs.getString(KEY_MQTT_USERNAME, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_MQTT_USERNAME, value).apply()
+
+    var mqttPassword: String
+        get() = prefs.getString(KEY_MQTT_PASSWORD, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_MQTT_PASSWORD, value).apply()
+
+    /** Topic to subscribe to; any message received on it counts as a doorbell trigger. */
+    var mqttTopic: String
+        get() = prefs.getString(KEY_MQTT_TOPIC, "babycam/doorbell") ?: "babycam/doorbell"
+        set(value) = prefs.edit().putString(KEY_MQTT_TOPIC, value.trim()).apply()
+
+    /** id of the CameraProfile to show when triggered - may be a camera not otherwise enabled. */
+    var doorbellCameraId: String
+        get() = prefs.getString(KEY_DOORBELL_CAMERA_ID, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_DOORBELL_CAMERA_ID, value).apply()
+
+    var doorbellDurationSeconds: Int
+        get() = prefs.getInt(KEY_DOORBELL_DURATION, 20)
+        set(value) = prefs.edit().putInt(KEY_DOORBELL_DURATION, value).apply()
+
+    fun doorbellCamera(): CameraProfile? = cameras.firstOrNull { it.id == doorbellCameraId }
+
     companion object {
         private const val PREFS_NAME = "babycam_settings"
         private const val KEY_CAMERAS = "cameras"
@@ -101,5 +144,14 @@ class SettingsStore(context: Context) {
         private const val KEY_MUTED = "muted"
         private const val KEY_AUTOSTART = "autostart"
         private const val KEY_OVERLAY_ENABLED = "overlay_enabled"
+        private const val KEY_MQTT_ENABLED = "mqtt_enabled"
+        private const val KEY_MQTT_HOST = "mqtt_host"
+        private const val KEY_MQTT_PORT = "mqtt_port"
+        private const val KEY_MQTT_TLS = "mqtt_use_tls"
+        private const val KEY_MQTT_USERNAME = "mqtt_username"
+        private const val KEY_MQTT_PASSWORD = "mqtt_password"
+        private const val KEY_MQTT_TOPIC = "mqtt_topic"
+        private const val KEY_DOORBELL_CAMERA_ID = "doorbell_camera_id"
+        private const val KEY_DOORBELL_DURATION = "doorbell_duration_seconds"
     }
 }

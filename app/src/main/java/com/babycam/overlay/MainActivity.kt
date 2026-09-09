@@ -56,10 +56,24 @@ class MainActivity : AppCompatActivity() {
     private lateinit var notificationPermissionStatus: TextView
     private lateinit var btnGrantNotificationPermission: Button
 
+    private lateinit var switchMqttEnabled: SwitchCompat
+    private lateinit var inputMqttHost: EditText
+    private lateinit var inputMqttPort: EditText
+    private lateinit var switchMqttTls: SwitchCompat
+    private lateinit var inputMqttUsername: EditText
+    private lateinit var inputMqttPassword: EditText
+    private lateinit var inputMqttTopic: EditText
+    private lateinit var mqttTestStatus: TextView
+    private lateinit var groupDoorbellCamera: RadioGroup
+    private lateinit var groupDoorbellDuration: RadioGroup
+    /** Kept in sync with what's currently shown in groupDoorbellCamera, so a checked radio id maps back to a CameraProfile. */
+    private var doorbellPickerCameras: List<CameraProfile> = emptyList()
+
     /** True once the camera list, layout mode, or rotation interval changed since the overlay was last (re)started. */
     private var camerasDirty = false
 
     private var testPlayer: ExoPlayer? = null
+    private var testMqttClient: MqttDoorbellClient? = null
     private val testHandler = Handler(Looper.getMainLooper())
 
     private val overlayPermissionLauncher =
@@ -104,6 +118,17 @@ class MainActivity : AppCompatActivity() {
         overlayPermissionStatus = findViewById(R.id.overlay_permission_status)
         notificationPermissionStatus = findViewById(R.id.notification_permission_status)
         btnGrantNotificationPermission = findViewById(R.id.btn_grant_notification_permission)
+
+        switchMqttEnabled = findViewById(R.id.switch_mqtt_enabled)
+        inputMqttHost = findViewById(R.id.input_mqtt_host)
+        inputMqttPort = findViewById(R.id.input_mqtt_port)
+        switchMqttTls = findViewById(R.id.switch_mqtt_tls)
+        inputMqttUsername = findViewById(R.id.input_mqtt_username)
+        inputMqttPassword = findViewById(R.id.input_mqtt_password)
+        inputMqttTopic = findViewById(R.id.input_mqtt_topic)
+        mqttTestStatus = findViewById(R.id.mqtt_test_status)
+        groupDoorbellCamera = findViewById(R.id.group_doorbell_camera)
+        groupDoorbellDuration = findViewById(R.id.group_doorbell_duration)
     }
 
     /** Builds the option RadioGroups from enums/constants so those stay the single source of truth. */
@@ -115,6 +140,9 @@ class MainActivity : AppCompatActivity() {
         OverlayPosition.entries.forEach { position -> groupPosition.addView(radioButtonFor(position.label, position.ordinal)) }
         OverlaySize.entries.forEach { size -> groupSize.addView(radioButtonFor(size.label, size.ordinal)) }
         OverlayOpacity.entries.forEach { opacity -> groupOpacity.addView(radioButtonFor(opacity.label, opacity.ordinal)) }
+        DOORBELL_DURATION_OPTIONS.forEachIndexed { index, seconds ->
+            groupDoorbellDuration.addView(radioButtonFor(getString(R.string.rotation_interval_option, seconds), index))
+        }
     }
 
     private fun radioButtonFor(label: String, id: Int): RadioButton = RadioButton(this).apply {
@@ -132,14 +160,44 @@ class MainActivity : AppCompatActivity() {
         groupOpacity.check(settings.opacity.ordinal)
         switchMute.isChecked = !settings.muted
         switchAutostart.isChecked = settings.autoStartOnBoot
+
+        switchMqttEnabled.isChecked = settings.mqttEnabled
+        inputMqttHost.setText(settings.mqttHost)
+        inputMqttPort.setText(settings.mqttPort.toString())
+        switchMqttTls.isChecked = settings.mqttUseTls
+        inputMqttUsername.setText(settings.mqttUsername)
+        inputMqttPassword.setText(settings.mqttPassword)
+        inputMqttTopic.setText(settings.mqttTopic)
+        groupDoorbellDuration.check(DOORBELL_DURATION_OPTIONS.indexOf(settings.doorbellDurationSeconds).coerceAtLeast(0))
+
         refreshCameraList()
         camerasDirty = false
+    }
+
+    /** Rebuilds the doorbell-camera RadioGroup from the current camera list and restores the saved selection. */
+    private fun refreshDoorbellCameraPicker() {
+        groupDoorbellCamera.removeAllViews()
+        doorbellPickerCameras = settings.cameras
+        if (doorbellPickerCameras.isEmpty()) {
+            groupDoorbellCamera.addView(TextView(this).apply {
+                text = getString(R.string.no_cameras_for_doorbell)
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+                textSize = 13f
+            })
+            return
+        }
+        doorbellPickerCameras.forEachIndexed { index, profile ->
+            groupDoorbellCamera.addView(radioButtonFor(profile.name.ifBlank { getString(R.string.unnamed_camera) }, index))
+        }
+        val savedIndex = doorbellPickerCameras.indexOfFirst { it.id == settings.doorbellCameraId }
+        if (savedIndex >= 0) groupDoorbellCamera.check(savedIndex)
     }
 
     private fun wireActions() {
         findViewById<Button>(R.id.btn_add_camera).setOnClickListener { showCameraDialog(null) }
         findViewById<Button>(R.id.btn_grant_overlay_permission).setOnClickListener { requestOverlayPermission() }
         btnGrantNotificationPermission.setOnClickListener { requestNotificationPermission() }
+        findViewById<Button>(R.id.btn_test_mqtt).setOnClickListener { testMqttConnection() }
         findViewById<Button>(R.id.btn_save_start).setOnClickListener { saveAndStart() }
         findViewById<Button>(R.id.btn_stop).setOnClickListener { stopOverlay() }
     }
@@ -155,9 +213,10 @@ class MainActivity : AppCompatActivity() {
                 setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
                 textSize = 13f
             })
-            return
+        } else {
+            cameras.forEach { profile -> cameraListContainer.addView(buildCameraRow(profile)) }
         }
-        cameras.forEach { profile -> cameraListContainer.addView(buildCameraRow(profile)) }
+        refreshDoorbellCameraPicker()
     }
 
     private fun buildCameraRow(profile: CameraProfile): View {
@@ -426,6 +485,56 @@ class MainActivity : AppCompatActivity() {
         testPlayer = null
     }
 
+    // ---- MQTT connection test (doorbell trigger) ------------------------------------------
+
+    private fun testMqttConnection() {
+        val host = inputMqttHost.text.toString().trim()
+        if (host.isBlank()) {
+            mqttTestStatus.text = getString(R.string.validation_missing_url)
+            return
+        }
+        releaseTestMqttClient()
+        mqttTestStatus.text = getString(R.string.mqtt_test_connecting)
+
+        val timeoutRunnable = Runnable {
+            mqttTestStatus.text = getString(R.string.mqtt_test_timeout)
+            releaseTestMqttClient()
+        }
+
+        val client = MqttDoorbellClient(
+            host = host,
+            port = inputMqttPort.text.toString().toIntOrNull() ?: 1883,
+            useTls = switchMqttTls.isChecked,
+            username = inputMqttUsername.text.toString(),
+            password = inputMqttPassword.text.toString(),
+            topic = inputMqttTopic.text.toString().trim().ifBlank { "babycam/doorbell" },
+            onTriggered = {}
+        )
+        testMqttClient = client
+        client.start(
+            onConnected = {
+                testHandler.post {
+                    testHandler.removeCallbacks(timeoutRunnable)
+                    mqttTestStatus.text = getString(R.string.mqtt_test_success)
+                    testHandler.postDelayed({ releaseTestMqttClient() }, 300)
+                }
+            },
+            onConnectFailed = { message ->
+                testHandler.post {
+                    testHandler.removeCallbacks(timeoutRunnable)
+                    mqttTestStatus.text = getString(R.string.mqtt_test_failed, message)
+                    releaseTestMqttClient()
+                }
+            }
+        )
+        testHandler.postDelayed(timeoutRunnable, TEST_TIMEOUT_MS)
+    }
+
+    private fun releaseTestMqttClient() {
+        testMqttClient?.stop()
+        testMqttClient = null
+    }
+
     // ---- Save / start / stop --------------------------------------------------------------
 
     private fun saveAndStart() {
@@ -440,8 +549,41 @@ class MainActivity : AppCompatActivity() {
             newLayoutMode != settings.layoutMode ||
             newRotationInterval != settings.rotationIntervalSeconds
 
+        val newMqttEnabled = switchMqttEnabled.isChecked
+        val newMqttHost = inputMqttHost.text.toString().trim()
+        val newMqttPort = inputMqttPort.text.toString().toIntOrNull() ?: 1883
+        val newMqttTls = switchMqttTls.isChecked
+        val newMqttUsername = inputMqttUsername.text.toString()
+        val newMqttPassword = inputMqttPassword.text.toString()
+        val newMqttTopic = inputMqttTopic.text.toString().trim().ifBlank { "babycam/doorbell" }
+        val newDoorbellCameraId = doorbellPickerCameras.getOrNull(groupDoorbellCamera.checkedRadioButtonId)?.id ?: ""
+        val newDoorbellDuration = DOORBELL_DURATION_OPTIONS[groupDoorbellDuration.checkedRadioButtonId.coerceAtLeast(0)]
+
+        if (newMqttEnabled && (newMqttHost.isBlank() || newDoorbellCameraId.isBlank())) {
+            overlayStatusText.text = getString(R.string.status_doorbell_incomplete)
+            return
+        }
+
+        val doorbellRelatedChanged = newMqttEnabled != settings.mqttEnabled ||
+            newMqttHost != settings.mqttHost ||
+            newMqttPort != settings.mqttPort ||
+            newMqttTls != settings.mqttUseTls ||
+            newMqttUsername != settings.mqttUsername ||
+            newMqttPassword != settings.mqttPassword ||
+            newMqttTopic != settings.mqttTopic ||
+            newDoorbellCameraId != settings.doorbellCameraId
+
         settings.layoutMode = newLayoutMode
         settings.rotationIntervalSeconds = newRotationInterval
+        settings.mqttEnabled = newMqttEnabled
+        settings.mqttHost = newMqttHost
+        settings.mqttPort = newMqttPort
+        settings.mqttUseTls = newMqttTls
+        settings.mqttUsername = newMqttUsername
+        settings.mqttPassword = newMqttPassword
+        settings.mqttTopic = newMqttTopic
+        settings.doorbellCameraId = newDoorbellCameraId
+        settings.doorbellDurationSeconds = newDoorbellDuration
 
         if (!canDrawOverlaysCompat(this)) {
             requestOverlayPermission()
@@ -466,6 +608,12 @@ class MainActivity : AppCompatActivity() {
         ContextCompat.startForegroundService(this, intent)
         camerasDirty = false
 
+        if (doorbellRelatedChanged && wasRunning) {
+            ContextCompat.startForegroundService(this, Intent(this, OverlayService::class.java).apply {
+                action = OverlayService.ACTION_REFRESH_DOORBELL
+            })
+        }
+
         overlayStatusText.text = getString(R.string.status_overlay_running)
     }
 
@@ -478,6 +626,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         releaseTestPlayer()
+        releaseTestMqttClient()
         testHandler.removeCallbacksAndMessages(null)
         super.onDestroy()
     }
@@ -485,5 +634,6 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val TEST_TIMEOUT_MS = 8_000L
         private val ROTATION_INTERVAL_OPTIONS = listOf(15, 30, 60)
+        private val DOORBELL_DURATION_OPTIONS = listOf(10, 20, 30, 60)
     }
 }

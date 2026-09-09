@@ -61,6 +61,28 @@
     <string name="section_automation">Automation</string>
     <string name="label_autostart">Start overlay automatically on boot</string>
 
+    <string name="section_doorbell">Doorbell trigger</string>
+    <string name="doorbell_explainer">Have Home Assistant publish an MQTT message when the doorbell rings, and the doorbell camera pops up automatically for a few seconds.</string>
+    <string name="label_mqtt_enabled">Enable doorbell trigger</string>
+    <string name="label_mqtt_host">Broker host</string>
+    <string name="hint_mqtt_host">192.168.1.10</string>
+    <string name="label_mqtt_port">Broker port</string>
+    <string name="hint_mqtt_port">1883</string>
+    <string name="label_mqtt_tls">Use TLS (mqtts, usually port 8883)</string>
+    <string name="label_mqtt_username">Username (optional)</string>
+    <string name="label_mqtt_password">Password (optional)</string>
+    <string name="label_mqtt_topic">Topic to subscribe to</string>
+    <string name="hint_mqtt_topic">babycam/doorbell</string>
+    <string name="btn_test_mqtt">Test broker connection</string>
+    <string name="mqtt_test_connecting">Connecting…</string>
+    <string name="mqtt_test_success">✓ Connected to the broker</string>
+    <string name="mqtt_test_failed">✗ Failed: %1$s</string>
+    <string name="mqtt_test_timeout">✗ Timed out waiting for the broker</string>
+    <string name="label_doorbell_camera">Camera to show when triggered</string>
+    <string name="no_cameras_for_doorbell">Add a camera first, then pick it here.</string>
+    <string name="label_doorbell_duration">How long to show it</string>
+    <string name="status_doorbell_incomplete">Doorbell trigger needs a broker host and a camera picked</string>
+
     <string name="section_permissions">Permissions</string>
     <string name="label_overlay_permission">Display over other apps</string>
     <string name="btn_grant_overlay_permission">Grant overlay permission</string>

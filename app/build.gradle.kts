@@ -74,4 +74,8 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-rtsp:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
     implementation("androidx.media3:media3-common:1.4.1")
+
+    // MQTT client for the Home Assistant doorbell trigger (subscribes only - no server/broker
+    // shipped in this app, just a client for whatever broker the user already runs).
+    implementation("org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5")
 }

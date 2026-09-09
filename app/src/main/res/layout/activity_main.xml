@@ -121,6 +121,89 @@
             android:text="@string/label_autostart"
             android:textColor="@color/text_primary" />
 
+        <!-- ===== Doorbell trigger ===== -->
+        <TextView style="@style/SectionHeader" android:text="@string/section_doorbell" />
+        <TextView style="@style/FieldLabel" android:text="@string/doorbell_explainer" android:layout_marginTop="0dp" />
+
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/switch_mqtt_enabled"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/label_mqtt_enabled"
+            android:textColor="@color/text_primary" />
+
+        <TextView style="@style/FieldLabel" android:text="@string/label_mqtt_host" />
+        <EditText
+            android:id="@+id/input_mqtt_host"
+            style="@style/FieldInput"
+            android:hint="@string/hint_mqtt_host"
+            android:inputType="textUri" />
+
+        <TextView style="@style/FieldLabel" android:text="@string/label_mqtt_port" />
+        <EditText
+            android:id="@+id/input_mqtt_port"
+            style="@style/FieldInput"
+            android:hint="@string/hint_mqtt_port"
+            android:inputType="number" />
+
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/switch_mqtt_tls"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/label_mqtt_tls"
+            android:textColor="@color/text_primary" />
+
+        <TextView style="@style/FieldLabel" android:text="@string/label_mqtt_username" />
+        <EditText
+            android:id="@+id/input_mqtt_username"
+            style="@style/FieldInput"
+            android:hint="@string/hint_username"
+            android:inputType="text" />
+
+        <TextView style="@style/FieldLabel" android:text="@string/label_mqtt_password" />
+        <EditText
+            android:id="@+id/input_mqtt_password"
+            style="@style/FieldInput"
+            android:hint="@string/hint_password"
+            android:inputType="textPassword" />
+
+        <TextView style="@style/FieldLabel" android:text="@string/label_mqtt_topic" />
+        <EditText
+            android:id="@+id/input_mqtt_topic"
+            style="@style/FieldInput"
+            android:hint="@string/hint_mqtt_topic"
+            android:inputType="text" />
+
+        <Button
+            android:id="@+id/btn_test_mqtt"
+            style="@style/SecondaryButton"
+            android:layout_marginTop="8dp"
+            android:text="@string/btn_test_mqtt" />
+
+        <TextView
+            android:id="@+id/mqtt_test_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
+
+        <TextView style="@style/FieldLabel" android:text="@string/label_doorbell_camera" />
+        <RadioGroup
+            android:id="@+id/group_doorbell_camera"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <TextView style="@style/FieldLabel" android:text="@string/label_doorbell_duration" />
+        <RadioGroup
+            android:id="@+id/group_doorbell_duration"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
         <!-- ===== Permissions ===== -->
         <TextView style="@style/SectionHeader" android:text="@string/section_permissions" />
 

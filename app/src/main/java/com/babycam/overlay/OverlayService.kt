@@ -49,7 +49,7 @@ class OverlayService : Service() {
         val badge: TextView
     )
 
-    private class CameraSlot(val cell: CameraCell) {
+    private class CameraSlot(var cell: CameraCell) {
         var player: ExoPlayer? = null
         var retryAttempt = 0
         var profile: CameraProfile? = null
@@ -70,11 +70,24 @@ class OverlayService : Service() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var isDestroyed = false
 
+    // ---- Doorbell trigger (MQTT) state -----------------------------------------------------
+    private var mqttClient: MqttDoorbellClient? = null
+    /** The slot currently showing the doorbell camera, if a trigger is active right now. */
+    private var doorbellSlot: CameraSlot? = null
+    /** True if [doorbellSlot] is a temporarily-added extra grid tile; false if it replaced an existing one. */
+    private var doorbellIsExtraTile = false
+    /** GRID mode, grid-already-full case: what was playing on the tile the doorbell took over. */
+    private var replacedSlotProfile: CameraProfile? = null
+    /** SINGLE_ROTATE mode: what was playing before the trigger, so it can resume afterwards. */
+    private var preDoorbellSingleProfile: CameraProfile? = null
+    private var doorbellRevertRunnable: Runnable? = null
+
     override fun onCreate() {
         super.onCreate()
         settings = SettingsStore(this)
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         createNotificationChannel()
+        startMqttClient()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -96,6 +109,11 @@ class OverlayService : Service() {
             ACTION_RESTART_STREAM -> {
                 ensureForegroundAndOverlay()
                 rebuildSlotsAndStart()
+                return START_STICKY
+            }
+
+            ACTION_REFRESH_DOORBELL -> {
+                startMqttClient()
                 return START_STICKY
             }
         }
@@ -313,6 +331,126 @@ class OverlayService : Service() {
         mainHandler.removeCallbacksAndMessages(null)
         slots.forEach { it.player?.release() }
         slots.clear()
+        // doorbellSlot either aliases one of the slots just released above (grid-full replace
+        // case) or is a separate extra tile never added to `slots` (needs releasing here).
+        if (doorbellIsExtraTile) {
+            doorbellSlot?.player?.release()
+        }
+        doorbellSlot = null
+        doorbellIsExtraTile = false
+        replacedSlotProfile = null
+        preDoorbellSingleProfile = null
+        doorbellRevertRunnable = null
+    }
+
+    // ---- Doorbell trigger (MQTT) ------------------------------------------------------------
+
+    private fun startMqttClient() {
+        stopMqttClient()
+        if (!settings.mqttEnabled) return
+        val newClient = MqttDoorbellClient(
+            host = settings.mqttHost,
+            port = settings.mqttPort,
+            useTls = settings.mqttUseTls,
+            username = settings.mqttUsername,
+            password = settings.mqttPassword,
+            topic = settings.mqttTopic,
+            onTriggered = { onDoorbellMessageReceived() }
+        )
+        mqttClient = newClient
+        newClient.start()
+    }
+
+    private fun stopMqttClient() {
+        mqttClient?.stop()
+        mqttClient = null
+    }
+
+    /** Called on Paho's own callback thread - hop to the main thread before touching any Views. */
+    private fun onDoorbellMessageReceived() {
+        mainHandler.post { handleDoorbellTrigger() }
+    }
+
+    private fun handleDoorbellTrigger() {
+        if (isDestroyed || !overlayAttached) return
+        val profile = settings.doorbellCamera() ?: return
+
+        doorbellRevertRunnable?.let { mainHandler.removeCallbacks(it) }
+
+        when (settings.layoutMode) {
+            LayoutMode.SINGLE_ROTATE -> {
+                val slot = slots.getOrNull(0) ?: return
+                if (preDoorbellSingleProfile == null) {
+                    preDoorbellSingleProfile = slot.profile
+                    mainHandler.removeCallbacks(rotationRunnable)
+                }
+                playCamera(slot, profile)
+            }
+
+            LayoutMode.GRID -> {
+                val active = doorbellSlot
+                if (active != null) {
+                    // Re-trigger while already showing - just replay to clear any error state.
+                    playCamera(active, profile)
+                } else if (slots.size < MAX_GRID_CAMERAS) {
+                    val cells = buildGridRows(slots.size + 1)
+                    slots.forEachIndexed { index, slot -> reattachSlot(slot, cells[index]) }
+                    val newSlot = CameraSlot(cells.last())
+                    doorbellSlot = newSlot
+                    doorbellIsExtraTile = true
+                    playCamera(newSlot, profile)
+                } else {
+                    val lastSlot = slots.last()
+                    replacedSlotProfile = lastSlot.profile
+                    doorbellSlot = lastSlot
+                    doorbellIsExtraTile = false
+                    playCamera(lastSlot, profile)
+                }
+            }
+        }
+
+        val revert = Runnable { revertDoorbell() }
+        doorbellRevertRunnable = revert
+        mainHandler.postDelayed(revert, settings.doorbellDurationSeconds * 1000L)
+    }
+
+    private fun revertDoorbell() {
+        doorbellRevertRunnable = null
+        when (settings.layoutMode) {
+            LayoutMode.SINGLE_ROTATE -> {
+                val prior = preDoorbellSingleProfile
+                preDoorbellSingleProfile = null
+                val slot = slots.getOrNull(0)
+                if (slot != null && prior != null) {
+                    playCamera(slot, prior)
+                }
+                if (rotationQueue.size > 1) scheduleRotation()
+            }
+
+            LayoutMode.GRID -> {
+                val slot = doorbellSlot ?: return
+                doorbellSlot = null
+                if (doorbellIsExtraTile) {
+                    doorbellIsExtraTile = false
+                    slot.player?.release()
+                    val cells = buildGridRows(slots.size)
+                    slots.forEachIndexed { index, s -> reattachSlot(s, cells[index]) }
+                } else {
+                    val prior = replacedSlotProfile
+                    replacedSlotProfile = null
+                    if (prior != null) playCamera(slot, prior)
+                }
+            }
+        }
+    }
+
+    /** Moves a slot's live player over to a freshly-built cell after a grid reflow, with no reconnect. */
+    private fun reattachSlot(slot: CameraSlot, newCell: CameraCell) {
+        val badgeVisible = slot.cell.badge.visibility
+        slot.cell.playerView.player = null
+        slot.cell = newCell
+        newCell.playerView.player = slot.player
+        newCell.badge.visibility = badgeVisible
     }
 
     // ---- Notification ----------------------------------------------------------------------
@@ -354,6 +492,7 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         isDestroyed = true
+        stopMqttClient()
         releaseAllSlots()
         if (overlayAttached && overlayView.isAttachedToWindow) {
             windowManager.removeView(overlayView)
@@ -374,6 +513,9 @@ class OverlayService : Service() {
 
         /** The camera list, layout mode, or rotation interval changed - tear down and rebuild playback. */
         const val ACTION_RESTART_STREAM = "com.babycam.overlay.action.RESTART_STREAM"
+
+        /** MQTT broker/doorbell settings changed - reconnect the MQTT client without touching playback. */
+        const val ACTION_REFRESH_DOORBELL = "com.babycam.overlay.action.REFRESH_DOORBELL"
 
         private const val CHANNEL_ID = "babycam_overlay_channel"
         private const val NOTIFICATION_ID = 42
