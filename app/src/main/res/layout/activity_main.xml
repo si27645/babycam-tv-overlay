@@ -205,6 +205,27 @@
             android:layout_height="wrap_content"
             android:orientation="vertical" />
 
+        <TextView style="@style/FieldLabel" android:text="@string/label_doorbell_display_mode" />
+        <RadioGroup
+            android:id="@+id/group_doorbell_display_mode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <TextView style="@style/FieldLabel" android:text="@string/label_doorbell_position" />
+        <RadioGroup
+            android:id="@+id/group_doorbell_position"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <TextView style="@style/FieldLabel" android:text="@string/label_doorbell_size" />
+        <RadioGroup
+            android:id="@+id/group_doorbell_size"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
         <!-- ===== Permissions ===== -->
         <TextView style="@style/SectionHeader" android:text="@string/section_permissions" />
 

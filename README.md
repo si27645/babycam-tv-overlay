@@ -104,30 +104,35 @@ have it pop up on a ring) — and how long the trigger stays up (10-60s):
   useful if you've got a front and back door and want either ring to cycle
   through both.
 
-A trigger temporarily takes over the existing overlay rather than opening
-a second independent window: in **single feed** mode it swaps the one
-slot to the doorbell camera(s), then resumes whatever was playing (and
-rotating) before; in **grid** mode it's added as an extra tile alongside
-what's already showing (up to the 4-tile cap), or takes over the last
-tile if the grid is already full — either way, that reverts afterward.
+**How it shows up** is a setting, since which choice actually works well
+depends entirely on the TV box's own hardware:
+
+- **Take over the main overlay** (default) — swaps the existing overlay's
+  content to the doorbell camera(s) rather than opening a second window:
+  in **single feed** mode it swaps the one slot, then resumes whatever was
+  playing (and rotating) before; in **grid** mode it's added as an extra
+  tile alongside what's already showing (up to the 4-tile cap), or takes
+  over the last tile if the grid is already full — either way, that
+  reverts afterward. Only ever needs **one** concurrent video decode, so
+  it's the safe choice on weaker/older boxes.
+- **Separate window** — opens a genuinely independent second floating
+  window (its own position/size, set below) that shows the doorbell
+  camera(s) *alongside* the main overlay without touching it at all.
+  Needs the box to decode and render **two** RTSP streams at once, which
+  not all hardware can actually do.
+
 A re-trigger while one is already active just resets the countdown rather
 than stacking. Use **Test broker connection** to confirm the app can reach
 your broker before saving.
 
-This is a deliberate hardware-driven choice, not the original design: an
-earlier version of this feature opened a genuinely separate second
-floating window so the doorbell camera could show *alongside* the main
-one without disturbing it. On real (weak/older) TV box hardware, that
-turned out to not work reliably — the box's GPU/compositor couldn't
-render two independently-decoding video surfaces at once; the decoder
-itself succeeded, but the second window's renderer stalled badly enough
-(an 800ms+ single frame, logged as `Davey!` under `OpenGLRenderer`) that
-it never produced a visible picture, while the main overlay kept working
-fine. Takeover only ever needs one concurrent video pipeline, which this
-class of hardware can actually handle. If you're building on stronger
-hardware and want the two-window behavior back, the previous
-implementation is in git history (look for the commit titled "Doorbell
-trigger: separate floating window, not a takeover" and its revert).
+**Why takeover is the default:** confirmed on real (weak/older) TV box
+hardware during development — the separate-window mode's video decoder
+succeeded, but the second window's renderer stalled badly enough (an
+800ms+ single frame, logged as `Davey!` under `OpenGLRenderer`) that it
+never produced a visible picture, while the main overlay and the takeover
+mode both kept working fine on the same device. If your box turns out to
+handle two concurrent video surfaces without trouble, switching to
+**Separate window** is just the one setting — no rebuild needed.
 
 ## Requirements
 

@@ -71,23 +71,32 @@ class OverlayService : Service() {
     private var isDestroyed = false
 
     // ---- Doorbell trigger (MQTT) state -----------------------------------------------------
+    // Two selectable display modes (SettingsStore.doorbellDisplayMode) since which one actually
+    // renders smoothly depends entirely on the TV box's hardware - see README "Doorbell trigger".
+    //
+    // TAKEOVER: doorbellSlot aliases an existing main-overlay slot (slots[0] in SINGLE_ROTATE,
+    // or slots.last() when GRID is already full) - only ever one concurrent video pipeline.
+    // GRID with room to spare instead adds a genuinely extra tile (doorbellIsExtraTile=true).
+    //
+    // SEPARATE_WINDOW: doorbellSlot belongs to its own independent WindowManager window
+    // (doorbellOverlayView/doorbellWindowParams), never touching the main overlay at all - two
+    // concurrent video pipelines, which not all hardware can actually composite.
+    //
+    // A dedicated doorbellHandler (not the main mainHandler) owns both modes' revert/rotation
+    // timers, so releaseAllSlots() rebuilding the *main* overlay can't accidentally cancel an
+    // in-progress trigger; activeDoorbellMode remembers which mode a trigger actually started in,
+    // in case the setting is changed while it's still showing.
     private var mqttClient: MqttDoorbellClient? = null
-    /**
-     * The slot currently showing the doorbell camera(s), if a trigger is active right now.
-     * Unified across both layout modes: in SINGLE_ROTATE it aliases slots[0] (like the
-     * GRID grid-already-full case aliases slots.last()); only the GRID extra-tile case is a
-     * genuinely separate slot never added to [slots].
-     */
+    private val doorbellHandler = Handler(Looper.getMainLooper())
+    private var activeDoorbellMode: DoorbellDisplayMode? = null
     private var doorbellSlot: CameraSlot? = null
-    /** True if [doorbellSlot] is a temporarily-added extra grid tile; false if it aliases an existing slot. */
     private var doorbellIsExtraTile = false
-    /** What was playing on [doorbellSlot] before the trigger started, so it can be restored afterwards. */
     private var replacedSlotProfile: CameraProfile? = null
+    private var doorbellOverlayView: View? = null
+    private var doorbellWindowParams: WindowManager.LayoutParams? = null
     /** The (possibly single-camera) set being shown for the current trigger, and where in it we are. */
     private var doorbellRotationQueue: List<CameraProfile> = emptyList()
     private var doorbellRotationIndex = 0
-    private var doorbellRevertRunnable: Runnable? = null
-    private var doorbellRotationRunnable: Runnable? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -107,7 +116,9 @@ class OverlayService : Service() {
             ACTION_REFRESH_SETTINGS -> {
                 if (overlayAttached) {
                     applyLayout()
-                    slots.forEach { it.player?.volume = if (settings.muted) 0f else 1f }
+                    val volume = if (settings.muted) 0f else 1f
+                    slots.forEach { it.player?.volume = volume }
+                    doorbellSlot?.player?.volume = volume
                     return START_STICKY
                 }
                 // Overlay not showing yet - fall through and do a full start instead.
@@ -121,6 +132,7 @@ class OverlayService : Service() {
 
             ACTION_REFRESH_DOORBELL -> {
                 startMqttClient()
+                applyDoorbellLayout()
                 return START_STICKY
             }
         }
@@ -338,19 +350,22 @@ class OverlayService : Service() {
         mainHandler.removeCallbacksAndMessages(null)
         slots.forEach { it.player?.release() }
         slots.clear()
-        // doorbellSlot either aliases one of the slots just released above (SINGLE_ROTATE, or
-        // GRID's grid-already-full case) or is a separate extra tile never added to `slots`
-        // (needs releasing here).
-        if (doorbellIsExtraTile) {
-            doorbellSlot?.player?.release()
+        // A TAKEOVER-mode doorbell trigger aliases a slot just released above (or is a genuine
+        // extra grid tile never added to `slots`) - either way it's now invalid and must be torn
+        // down too. A SEPARATE_WINDOW-mode trigger is fully independent of the main overlay and
+        // is deliberately left alone here even while the main overlay rebuilds.
+        if (activeDoorbellMode == DoorbellDisplayMode.TAKEOVER) {
+            if (doorbellIsExtraTile) {
+                doorbellSlot?.player?.release()
+            }
+            doorbellSlot = null
+            doorbellIsExtraTile = false
+            replacedSlotProfile = null
+            activeDoorbellMode = null
+            doorbellHandler.removeCallbacksAndMessages(null)
+            doorbellRotationQueue = emptyList()
+            doorbellRotationIndex = 0
         }
-        doorbellSlot = null
-        doorbellIsExtraTile = false
-        replacedSlotProfile = null
-        doorbellRevertRunnable = null
-        doorbellRotationRunnable = null
-        doorbellRotationQueue = emptyList()
-        doorbellRotationIndex = 0
     }
 
     // ---- Doorbell trigger (MQTT) ------------------------------------------------------------
@@ -378,65 +393,143 @@ class OverlayService : Service() {
 
     /** Called on Paho's own callback thread - hop to the main thread before touching any Views. */
     private fun onDoorbellMessageReceived() {
-        mainHandler.post { handleDoorbellTrigger() }
+        doorbellHandler.post { handleDoorbellTrigger() }
     }
 
     private fun handleDoorbellTrigger() {
-        if (isDestroyed || !overlayAttached) return
+        if (isDestroyed) return
         val profiles = settings.doorbellCameras()
         if (profiles.isEmpty()) return
 
-        doorbellRevertRunnable?.let { mainHandler.removeCallbacks(it) }
-        doorbellRotationRunnable?.let { mainHandler.removeCallbacks(it) }
+        doorbellHandler.removeCallbacksAndMessages(null)
+
+        val mode = settings.doorbellDisplayMode
+        if (activeDoorbellMode != null && activeDoorbellMode != mode) {
+            // The mode setting changed while a trigger from the *old* mode was still showing -
+            // tear that one down properly before starting fresh in the new mode.
+            endActiveDoorbellTrigger(activeDoorbellMode!!)
+        }
+        activeDoorbellMode = mode
+
         doorbellRotationQueue = profiles
         doorbellRotationIndex = 0
 
-        if (doorbellSlot == null) {
-            // Not currently active - claim a slot the same way regardless of layout mode:
-            // SINGLE_ROTATE aliases the one slot, GRID either adds a tile or (if already full)
-            // aliases the last tile - both "alias" cases remember what to restore afterward.
-            when (settings.layoutMode) {
-                LayoutMode.SINGLE_ROTATE -> {
-                    val slot = slots.getOrNull(0) ?: return
-                    replacedSlotProfile = slot.profile
-                    mainHandler.removeCallbacks(rotationRunnable)
-                    doorbellSlot = slot
-                    doorbellIsExtraTile = false
+        when (mode) {
+            DoorbellDisplayMode.TAKEOVER -> {
+                if (!overlayAttached) {
+                    activeDoorbellMode = null
+                    return
                 }
-
-                LayoutMode.GRID -> {
-                    if (slots.size < MAX_GRID_CAMERAS) {
-                        val cells = buildGridRows(slots.size + 1)
-                        slots.forEachIndexed { index, slot -> reattachSlot(slot, cells[index]) }
-                        doorbellSlot = CameraSlot(cells.last())
-                        doorbellIsExtraTile = true
-                    } else {
-                        val lastSlot = slots.last()
-                        replacedSlotProfile = lastSlot.profile
-                        doorbellSlot = lastSlot
-                        doorbellIsExtraTile = false
-                    }
-                }
+                if (doorbellSlot == null) claimTakeoverSlot()
+            }
+            DoorbellDisplayMode.SEPARATE_WINDOW -> {
+                if (doorbellOverlayView == null) showDoorbellOverlay()
             }
         }
         // Re-trigger while already active just restarts on the first camera and resets the
-        // countdown/rotation below, rather than stacking a second overlay.
+        // countdown/rotation below, rather than stacking a second overlay/window.
 
         doorbellSlot?.let { playCamera(it, profiles[0]) }
         if (profiles.size > 1) scheduleDoorbellRotation()
 
-        val revert = Runnable { revertDoorbell() }
-        doorbellRevertRunnable = revert
-        mainHandler.postDelayed(revert, settings.doorbellDurationSeconds * 1000L)
+        doorbellHandler.postDelayed({ revertDoorbell() }, settings.doorbellDurationSeconds * 1000L)
+    }
+
+    /** TAKEOVER mode: claim a slot the same way regardless of layout mode - see the class-level doc comment. */
+    private fun claimTakeoverSlot() {
+        when (settings.layoutMode) {
+            LayoutMode.SINGLE_ROTATE -> {
+                val slot = slots.getOrNull(0) ?: return
+                replacedSlotProfile = slot.profile
+                mainHandler.removeCallbacks(rotationRunnable)
+                doorbellSlot = slot
+                doorbellIsExtraTile = false
+            }
+
+            LayoutMode.GRID -> {
+                if (slots.size < MAX_GRID_CAMERAS) {
+                    val cells = buildGridRows(slots.size + 1)
+                    slots.forEachIndexed { index, slot -> reattachSlot(slot, cells[index]) }
+                    doorbellSlot = CameraSlot(cells.last())
+                    doorbellIsExtraTile = true
+                } else {
+                    val lastSlot = slots.last()
+                    replacedSlotProfile = lastSlot.profile
+                    doorbellSlot = lastSlot
+                    doorbellIsExtraTile = false
+                }
+            }
+        }
+    }
+
+    /** SEPARATE_WINDOW mode: opens its own floating window - separate from, and never touching, the main overlay. */
+    private fun showDoorbellOverlay() {
+        val inflater = LayoutInflater.from(this)
+        val view = inflater.inflate(R.layout.overlay_camera, null)
+        val container = view.findViewById<LinearLayout>(R.id.overlay_grid_container)
+        val cell = buildCell()
+        container.addView(
+            cell.container,
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        )
+        doorbellSlot = CameraSlot(cell)
+
+        val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
+        }
+        val params = WindowManager.LayoutParams(
+            0, 0, overlayType,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        )
+
+        doorbellOverlayView = view
+        doorbellWindowParams = params
+        applyDoorbellLayout()
+        windowManager.addView(view, params)
+    }
+
+    private fun applyDoorbellLayout() {
+        val view = doorbellOverlayView ?: return
+        val params = doorbellWindowParams ?: return
+        val metrics = resources.displayMetrics
+        val width = (metrics.widthPixels * settings.doorbellSize.widthPercent).toInt()
+        val height = (width * 9.0 / 16.0).toInt()
+
+        params.width = width
+        params.height = height
+        params.gravity = gravityFor(settings.doorbellPosition)
+        val margin = dp(16)
+        params.x = margin
+        params.y = margin
+        view.alpha = settings.opacity.alpha
+
+        if (view.isAttachedToWindow) {
+            windowManager.updateViewLayout(view, params)
+        }
+    }
+
+    private fun hideDoorbellOverlay() {
+        val view = doorbellOverlayView ?: return
+        doorbellSlot?.player?.release()
+        doorbellSlot = null
+        runCatching {
+            if (view.isAttachedToWindow) windowManager.removeView(view)
+        }
+        doorbellOverlayView = null
+        doorbellWindowParams = null
     }
 
     /** Splits the trigger duration evenly across the selected doorbell cameras and cycles through them. */
     private fun scheduleDoorbellRotation() {
         val perCameraMs = (settings.doorbellDurationSeconds * 1000L / doorbellRotationQueue.size)
             .coerceAtLeast(3_000L)
-        val runnable = Runnable { advanceDoorbellRotation() }
-        doorbellRotationRunnable = runnable
-        mainHandler.postDelayed(runnable, perCameraMs)
+        doorbellHandler.postDelayed({ advanceDoorbellRotation() }, perCameraMs)
     }
 
     private fun advanceDoorbellRotation() {
@@ -448,25 +541,31 @@ class OverlayService : Service() {
     }
 
     private fun revertDoorbell() {
-        doorbellRevertRunnable = null
-        doorbellRotationRunnable?.let { mainHandler.removeCallbacks(it) }
-        doorbellRotationRunnable = null
         doorbellRotationQueue = emptyList()
+        val mode = activeDoorbellMode ?: return
+        activeDoorbellMode = null
+        endActiveDoorbellTrigger(mode)
+    }
 
-        val slot = doorbellSlot ?: return
-        doorbellSlot = null
-
-        if (doorbellIsExtraTile) {
-            doorbellIsExtraTile = false
-            slot.player?.release()
-            val cells = buildGridRows(slots.size)
-            slots.forEachIndexed { index, s -> reattachSlot(s, cells[index]) }
-        } else {
-            val prior = replacedSlotProfile
-            replacedSlotProfile = null
-            if (prior != null) playCamera(slot, prior)
-            if (settings.layoutMode == LayoutMode.SINGLE_ROTATE && rotationQueue.size > 1) {
-                scheduleRotation()
+    private fun endActiveDoorbellTrigger(mode: DoorbellDisplayMode) {
+        when (mode) {
+            DoorbellDisplayMode.SEPARATE_WINDOW -> hideDoorbellOverlay()
+            DoorbellDisplayMode.TAKEOVER -> {
+                val slot = doorbellSlot ?: return
+                doorbellSlot = null
+                if (doorbellIsExtraTile) {
+                    doorbellIsExtraTile = false
+                    slot.player?.release()
+                    val cells = buildGridRows(slots.size)
+                    slots.forEachIndexed { index, s -> reattachSlot(s, cells[index]) }
+                } else {
+                    val prior = replacedSlotProfile
+                    replacedSlotProfile = null
+                    if (prior != null) playCamera(slot, prior)
+                    if (settings.layoutMode == LayoutMode.SINGLE_ROTATE && rotationQueue.size > 1) {
+                        scheduleRotation()
+                    }
+                }
             }
         }
     }
@@ -520,7 +619,9 @@ class OverlayService : Service() {
     override fun onDestroy() {
         isDestroyed = true
         stopMqttClient()
-        releaseAllSlots()
+        doorbellHandler.removeCallbacksAndMessages(null)
+        hideDoorbellOverlay() // no-op unless a SEPARATE_WINDOW trigger is currently active
+        releaseAllSlots() // also tears down a TAKEOVER-mode trigger, if one is currently active
         if (overlayAttached && overlayView.isAttachedToWindow) {
             windowManager.removeView(overlayView)
         }

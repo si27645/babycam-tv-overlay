@@ -33,6 +33,18 @@ enum class LayoutMode(val label: String) {
 }
 
 /**
+ * How a doorbell trigger displays its camera(s) relative to the main overlay. Both need only
+ * one video pipeline (TAKEOVER) or two running at once (SEPARATE_WINDOW) - which one actually
+ * works smoothly depends entirely on the TV box's own GPU/decoder, hence this being a setting
+ * rather than a fixed choice. See README "Doorbell trigger" for the hardware finding behind
+ * TAKEOVER being the default.
+ */
+enum class DoorbellDisplayMode(val label: String) {
+    TAKEOVER("Take over the main overlay (safer on weaker/older boxes)"),
+    SEPARATE_WINDOW("Open a separate window (needs a TV box that can decode 2 videos at once)")
+}
+
+/**
  * Thin wrapper around SharedPreferences holding every user-configurable setting.
  * Shared by MainActivity (edits settings) and OverlayService / BootReceiver (reads them).
  */
@@ -138,6 +150,25 @@ class SettingsStore(context: Context) {
         get() = prefs.getInt(KEY_DOORBELL_DURATION, 20)
         set(value) = prefs.edit().putInt(KEY_DOORBELL_DURATION, value).apply()
 
+    var doorbellDisplayMode: DoorbellDisplayMode
+        get() = runCatching {
+            DoorbellDisplayMode.valueOf(prefs.getString(KEY_DOORBELL_DISPLAY_MODE, DoorbellDisplayMode.TAKEOVER.name)!!)
+        }.getOrDefault(DoorbellDisplayMode.TAKEOVER)
+        set(value) = prefs.edit().putString(KEY_DOORBELL_DISPLAY_MODE, value.name).apply()
+
+    /** SEPARATE_WINDOW mode only - its own position/size, independent of the main overlay's. */
+    var doorbellPosition: OverlayPosition
+        get() = runCatching {
+            OverlayPosition.valueOf(prefs.getString(KEY_DOORBELL_POSITION, OverlayPosition.BOTTOM_START.name)!!)
+        }.getOrDefault(OverlayPosition.BOTTOM_START)
+        set(value) = prefs.edit().putString(KEY_DOORBELL_POSITION, value.name).apply()
+
+    var doorbellSize: OverlaySize
+        get() = runCatching {
+            OverlaySize.valueOf(prefs.getString(KEY_DOORBELL_SIZE, OverlaySize.MEDIUM.name)!!)
+        }.getOrDefault(OverlaySize.MEDIUM)
+        set(value) = prefs.edit().putString(KEY_DOORBELL_SIZE, value.name).apply()
+
     /** [doorbellCameraIds] resolved against the current camera list, in that list's order. */
     fun doorbellCameras(): List<CameraProfile> {
         val ids = doorbellCameraIds
@@ -164,5 +195,8 @@ class SettingsStore(context: Context) {
         private const val KEY_MQTT_TOPIC = "mqtt_topic"
         private const val KEY_DOORBELL_CAMERA_IDS = "doorbell_camera_ids"
         private const val KEY_DOORBELL_DURATION = "doorbell_duration_seconds"
+        private const val KEY_DOORBELL_DISPLAY_MODE = "doorbell_display_mode"
+        private const val KEY_DOORBELL_POSITION = "doorbell_position"
+        private const val KEY_DOORBELL_SIZE = "doorbell_size"
     }
 }
