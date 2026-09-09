@@ -243,16 +243,30 @@ class MainActivity : AppCompatActivity() {
         }
 
         val label = profile.name.ifBlank { getString(R.string.unnamed_camera) }
+        val enabledCheckbox = CheckBox(this).apply {
+            isChecked = profile.enabled
+            setOnClickListener { setCameraEnabled(profile, isChecked) }
+        }
         val nameText = TextView(this).apply {
-            text = if (profile.enabled) label else getString(R.string.camera_disabled_label, label)
+            text = label
             setTextColor(ContextCompat.getColor(this@MainActivity, if (profile.enabled) R.color.text_primary else R.color.text_secondary))
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(4)
+            }
         }
 
+        row.addView(enabledCheckbox)
         row.addView(nameText)
         row.addView(smallButton(getString(R.string.btn_edit)) { showCameraDialog(profile) })
         row.addView(smallButton(getString(R.string.btn_delete)) { confirmDeleteCamera(profile) })
         return row
+    }
+
+    /** Quick on/off toggle for whether a camera shows in the normal overlay (single-feed/grid), without opening its edit dialog. */
+    private fun setCameraEnabled(profile: CameraProfile, enabled: Boolean) {
+        settings.cameras = settings.cameras.map { if (it.id == profile.id) it.copy(enabled = enabled) else it }
+        camerasDirty = true
+        refreshCameraList()
     }
 
     private fun smallButton(label: String, onClick: () -> Unit): Button = Button(this).apply {
@@ -303,7 +317,11 @@ class MainActivity : AppCompatActivity() {
             inputPassword.setText(existing.password)
             checkEnabled.isChecked = existing.enabled
         } else {
-            checkEnabled.isChecked = true
+            // Default a brand-new camera to enabled only if it'd be the first one; once at
+            // least one camera already shows normally, further additions default to off so
+            // adding a 2nd/3rd camera doesn't silently start rotating/gridding them all -
+            // the user opts each one in via this checkbox or the list's inline toggle.
+            checkEnabled.isChecked = settings.cameras.none { it.enabled }
         }
 
         btnDiscover.setOnClickListener {

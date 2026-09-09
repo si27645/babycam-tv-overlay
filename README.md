@@ -224,10 +224,17 @@ file manager once).
    (ONVIF)** and pick one from the scan, or type the RTSP URL (and
    username/password if needed — credentials get URL-encoded automatically).
    Tap **Test connection** to confirm the box can actually reach the camera,
-   then **Save**. Repeat for additional cameras.
-5. If you added more than one camera, pick **Single feed** or **Grid** under
-   **Multiple cameras**, and a rotation interval if using single-feed with
-   2+ cameras enabled.
+   then **Save**. Repeat for additional cameras. The checkbox next to each
+   camera in the list controls whether it shows in the normal overlay —
+   the first camera you add defaults to checked, every one after that
+   defaults to unchecked, so adding more cameras never silently starts
+   rotating/gridding all of them; check the ones you actually want shown
+   day to day (a camera you leave unchecked here can still be picked
+   further down as a doorbell-trigger camera without ever appearing
+   normally).
+5. If you checked more than one camera, pick **Single feed** or **Grid**
+   under **Multiple cameras**, and a rotation interval if using single-feed
+   with 2+ cameras checked.
 6. Pick a position/size/opacity you like, leave audio muted unless you want
    to hear the room, and optionally enable **Start overlay automatically on
    boot**.

@@ -9,9 +9,9 @@
     <string name="status_no_cameras">Add at least one enabled camera first</string>
 
     <string name="section_cameras">Cameras</string>
+    <string name="cameras_explainer">Check the ones to show normally (single-feed or grid, below). Leave the rest unchecked to keep them saved but hidden — or use them only for the doorbell trigger further down.</string>
     <string name="no_cameras_yet">No cameras added yet.</string>
     <string name="unnamed_camera">Unnamed camera</string>
-    <string name="camera_disabled_label">%1$s (disabled)</string>
     <string name="btn_add_camera">Add camera</string>
     <string name="btn_edit">Edit</string>
     <string name="btn_delete">Delete</string>

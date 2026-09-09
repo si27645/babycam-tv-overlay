@@ -52,6 +52,7 @@
 
         <!-- ===== Cameras ===== -->
         <TextView style="@style/SectionHeader" android:text="@string/section_cameras" />
+        <TextView style="@style/FieldLabel" android:text="@string/cameras_explainer" android:layout_marginTop="0dp" />
 
         <LinearLayout
             android:id="@+id/camera_list_container"
