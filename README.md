@@ -134,6 +134,25 @@ mode both kept working fine on the same device. If your box turns out to
 handle two concurrent video surfaces without trouble, switching to
 **Separate window** is just the one setting — no rebuild needed.
 
+**Doorbell listening works independently of the main camera view.** You
+don't need any main camera enabled at all — if the doorbell trigger is
+fully set up (enabled, a broker host, at least one camera picked),
+**Save & start overlay** will start the service just for that, with no
+main overlay window shown at all until (if ever) you enable a main
+camera. The reverse holds too: disabling every main camera doesn't kill
+MQTT listening as long as the doorbell trigger stays configured. The one
+exception is **Take over the main overlay** mode specifically — by
+definition there's nothing to "take over" if no main camera view is
+running, so a trigger silently does nothing in that combination; use
+**Separate window** mode instead for a doorbell-only setup, since that
+opens its own window regardless of whether the main overlay exists.
+
+If the doorbell trigger *isn't* fully configured and no main camera is
+enabled either, **Save & start overlay** won't do anything — and if
+neither was ever configured, an MQTT message that arrives while the
+overlay was never started (or was stopped) is simply never seen: there's
+no persistent queue, nothing gets delivered late once you do start it.
+
 ## Requirements
 
 - Android Studio (already installed) or just the command line — this repo

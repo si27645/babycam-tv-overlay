@@ -8,8 +8,9 @@ import androidx.core.content.ContextCompat
 
 /**
  * Restarts the overlay after the TV box reboots (power cut, etc.), but only if the user
- * explicitly opted in via the "Auto-start on boot" switch, a stream URL is configured, and
- * the overlay permission is still granted.
+ * explicitly opted in via the "Auto-start on boot" switch, there's actually something for the
+ * service to do (a camera to show or a fully configured doorbell trigger), and the overlay
+ * permission is still granted.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -17,7 +18,7 @@ class BootReceiver : BroadcastReceiver() {
 
         val settings = SettingsStore(context)
         if (!settings.autoStartOnBoot) return
-        if (settings.enabledCameras().isEmpty()) return
+        if (!settings.needsOverlayService()) return
         if (!canDrawOverlaysCompat(context)) return
 
         val serviceIntent = Intent(context, OverlayService::class.java)

@@ -147,7 +147,11 @@ class OverlayService : Service() {
 
     private fun ensureForegroundAndOverlay() {
         startForeground(NOTIFICATION_ID, buildNotification())
-        if (!overlayAttached) {
+        // Only create the main overlay window if there's actually something to show in it - a
+        // doorbell-only setup (no main cameras enabled) has no use for an empty bordered window
+        // sitting on screen. TAKEOVER-mode doorbell triggers correctly no-op without one (there's
+        // nothing to take over); SEPARATE_WINDOW-mode triggers open their own window regardless.
+        if (!overlayAttached && settings.enabledCameras().isNotEmpty()) {
             showOverlay()
         }
     }
@@ -213,8 +217,23 @@ class OverlayService : Service() {
 
         val enabled = settings.enabledCameras()
         if (enabled.isEmpty()) {
-            stopSelf()
+            // Nothing to show in the main overlay - tear its window down if it's still up from
+            // before (e.g. the user just disabled their last main camera), but keep the service
+            // itself (and MQTT) alive if doorbell listening is still configured.
+            if (overlayAttached && overlayView.isAttachedToWindow) {
+                windowManager.removeView(overlayView)
+            }
+            overlayAttached = false
+            if (!settings.doorbellConfigured()) {
+                stopSelf()
+            }
             return
+        }
+
+        if (!overlayAttached) {
+            // Doorbell-only -> main-camera transition: the window wasn't created by
+            // ensureForegroundAndOverlay() earlier because there was nothing to show yet.
+            showOverlay()
         }
 
         when (settings.layoutMode) {

@@ -582,11 +582,6 @@ class MainActivity : AppCompatActivity() {
     // ---- Save / start / stop --------------------------------------------------------------
 
     private fun saveAndStart() {
-        if (settings.enabledCameras().isEmpty()) {
-            overlayStatusText.text = getString(R.string.status_no_cameras)
-            return
-        }
-
         val newLayoutMode = LayoutMode.entries[groupLayoutMode.checkedRadioButtonId.coerceAtLeast(0)]
         val newRotationInterval = ROTATION_INTERVAL_OPTIONS[groupRotationInterval.checkedRadioButtonId.coerceAtLeast(0)]
         val streamRelatedChanged = camerasDirty ||
@@ -608,6 +603,14 @@ class MainActivity : AppCompatActivity() {
 
         if (newMqttEnabled && (newMqttHost.isBlank() || newDoorbellCameraIds.isEmpty())) {
             overlayStatusText.text = getString(R.string.status_doorbell_incomplete)
+            return
+        }
+
+        // The two features are independent - either one enabled cameras or a fully configured
+        // doorbell trigger is enough reason to start the service; only block if *neither* applies.
+        val doorbellWillBeConfigured = newMqttEnabled && newMqttHost.isNotBlank() && newDoorbellCameraIds.isNotEmpty()
+        if (settings.enabledCameras().isEmpty() && !doorbellWillBeConfigured) {
+            overlayStatusText.text = getString(R.string.status_no_cameras)
             return
         }
 

@@ -175,6 +175,17 @@ class SettingsStore(context: Context) {
         return cameras.filter { it.id in ids }
     }
 
+    /** Whether the doorbell trigger is fully configured (enabled, a broker host, and at least one camera picked). */
+    fun doorbellConfigured(): Boolean = mqttEnabled && mqttHost.isNotBlank() && doorbellCameras().isNotEmpty()
+
+    /**
+     * Whether OverlayService has any reason to be running at all: main cameras to show, or
+     * doorbell listening configured - the two are independent, so either one alone is enough.
+     * Without this, turning off every main camera (or never enabling one) would also silently
+     * kill MQTT listening, even if the doorbell trigger was otherwise fully set up.
+     */
+    fun needsOverlayService(): Boolean = enabledCameras().isNotEmpty() || doorbellConfigured()
+
     companion object {
         private const val PREFS_NAME = "babycam_settings"
         private const val KEY_CAMERAS = "cameras"

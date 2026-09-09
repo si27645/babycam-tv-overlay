@@ -6,7 +6,7 @@
     <string name="status_prefix">Overlay status</string>
     <string name="status_overlay_running">Running</string>
     <string name="status_overlay_stopped">Stopped</string>
-    <string name="status_no_cameras">Add at least one enabled camera first</string>
+    <string name="status_no_cameras">Enable at least one camera, or fully set up the doorbell trigger, first</string>
 
     <string name="section_cameras">Cameras</string>
     <string name="cameras_explainer">Check the ones to show normally (single-feed or grid, below). Leave the rest unchecked to keep them saved but hidden — or use them only for the doorbell trigger further down.</string>
