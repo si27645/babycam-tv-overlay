@@ -137,13 +137,24 @@ file manager once).
 
 ## Troubleshooting
 
-- **"Display over other apps" doesn't seem to do anything / no system
-  screen appears.** A few very generic/off-brand boxes ship a stripped-down
-  Settings app that doesn't expose this screen properly. Try Settings → Apps
-  → BabyCam Overlay → Permissions directly on the box, or check if the
-  vendor has a "floating window"/"pop-up window" toggle elsewhere in
-  Settings — some skinned boxes (certain Amlogic/Allwinner firmwares) rename
-  it.
+- **Tapping "Grant overlay permission" used to crash / "Display over other
+  apps" doesn't seem to do anything.** Confirmed on a stock Xiaomi Mi Box:
+  some Android TV builds ship no settings screen at all for this permission
+  (`pm resolve-activity` on the device returns nothing for
+  `ACTION_MANAGE_OVERLAY_PERMISSION`). The app now falls back to the generic
+  app-details screen instead of crashing, but that screen may *also* have no
+  toggle for it on some boxes. If neither works, grant it directly over adb:
+  `adb shell appops set com.babycam.overlay SYSTEM_ALERT_WINDOW allow` — this
+  persists across app restarts (not across uninstall/reinstall) and needs no
+  UI at all.
+- **The overlay shows fine over the home screen/launcher but disappears
+  behind another app's video (a live-TV/IPTV app, in particular).**
+  Confirmed root cause on real hardware: many TV chipsets composite a
+  `SurfaceView`'s video on a dedicated hardware overlay plane that ignores
+  normal Android window z-order, so another app's own video can visually
+  win even though our window is logically on top. Fixed by rendering
+  through a `TextureView` instead (see `overlay_player_cell.xml`) — if this
+  regresses on some device, that's the first place to look.
 - **Stream connects in Test but the overlay stays black / keeps
   reconnecting.** Check that the box and camera are on the same subnet/VLAN
   (RTSP typically won't traverse routed networks without extra config), and
