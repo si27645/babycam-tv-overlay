@@ -138,6 +138,23 @@ class SettingsStore(context: Context) {
         get() = prefs.getInt(KEY_DOORBELL_DURATION, 20)
         set(value) = prefs.edit().putInt(KEY_DOORBELL_DURATION, value).apply()
 
+    /**
+     * The doorbell trigger opens its own separate floating window - independent of, and never
+     * replacing, the main overlay - so it has its own position/size rather than sharing the
+     * main overlay's. Defaults to the opposite corner from the main overlay's own default.
+     */
+    var doorbellPosition: OverlayPosition
+        get() = runCatching {
+            OverlayPosition.valueOf(prefs.getString(KEY_DOORBELL_POSITION, OverlayPosition.BOTTOM_START.name)!!)
+        }.getOrDefault(OverlayPosition.BOTTOM_START)
+        set(value) = prefs.edit().putString(KEY_DOORBELL_POSITION, value.name).apply()
+
+    var doorbellSize: OverlaySize
+        get() = runCatching {
+            OverlaySize.valueOf(prefs.getString(KEY_DOORBELL_SIZE, OverlaySize.MEDIUM.name)!!)
+        }.getOrDefault(OverlaySize.MEDIUM)
+        set(value) = prefs.edit().putString(KEY_DOORBELL_SIZE, value.name).apply()
+
     /** [doorbellCameraIds] resolved against the current camera list, in that list's order. */
     fun doorbellCameras(): List<CameraProfile> {
         val ids = doorbellCameraIds
@@ -164,5 +181,7 @@ class SettingsStore(context: Context) {
         private const val KEY_MQTT_TOPIC = "mqtt_topic"
         private const val KEY_DOORBELL_CAMERA_IDS = "doorbell_camera_ids"
         private const val KEY_DOORBELL_DURATION = "doorbell_duration_seconds"
+        private const val KEY_DOORBELL_POSITION = "doorbell_position"
+        private const val KEY_DOORBELL_SIZE = "doorbell_size"
     }
 }

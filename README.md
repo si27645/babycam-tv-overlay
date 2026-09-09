@@ -99,24 +99,19 @@ rotation/grid (you can keep a doorbell camera out of normal view and only
 have it pop up on a ring) — and how long the trigger stays up (10-60s):
 
 - **Pick one** and it's shown statically for the whole duration.
-- **Pick several** and the overlay rotates through them, splitting the
+- **Pick several** and the popup rotates through them, splitting the
   duration evenly (e.g. two cameras and a 20s duration means 10s each) —
   useful if you've got a front and back door and want either ring to cycle
   through both.
 
-What actually happens to the rest of the overlay depends on the layout
-mode already in use:
-
-- **Single feed** — temporarily switches to the doorbell camera(s), then
-  resumes whatever was playing (and rotating) before.
-- **Grid** — the doorbell camera(s) take over one tile: added as an extra
-  tile alongside what's already showing (up to the 4-tile cap), or if the
-  grid is already full, temporarily taking over the last tile instead —
-  either way, that tile reverts afterward.
-
-A re-trigger while one is already active just resets the countdown rather
-than stacking. Use **Test broker connection** to confirm the app can reach
-your broker before saving.
+A trigger opens its **own separate floating window** with its own
+position and size (set those two further down) — it never touches or
+replaces whatever the main overlay is already showing, in either layout
+mode, so your normal view keeps playing undisturbed the whole time. Pick a
+position/size for it that doesn't overlap the main overlay's own spot. A
+re-trigger while one is already showing just resets the countdown rather
+than opening a second one. Use **Test broker connection** to confirm the
+app can reach your broker before saving.
 
 ## Requirements
 
@@ -290,7 +285,18 @@ file manager once).
   topic matches exactly on both sides (case-sensitive), and that the HA
   automation is actually publishing (Developer Tools → MQTT → Listen to a
   topic, in Home Assistant, is the fastest way to confirm the message is
-  really being sent).
+  really being sent — or `mosquitto_sub -h <broker> -t <topic> -v` from a
+  terminal, paired with `mosquitto_pub` on the same topic to fire a manual
+  test).
+- **A specific camera "shows then keeps reconnecting" (badge flickers
+  repeatedly) but others are fine.** Confirmed root cause on real hardware:
+  the camera's stream resolution/bitrate is too much for that box's
+  hardware video decoder (Logcat will show a `MediaCodecVideoDecoderException`
+  under `ExoPlayerImplInternal`, not an RTSP/network error). This is a
+  per-camera stream setting, not an app bug — point that camera's URL at
+  its lower-resolution **sub** stream instead of **main** (for Reolink
+  cameras, swap `h264Preview_01_main` for `h264Preview_01_sub` in the URL)
+  and it should connect cleanly.
 
 ## Project layout
 
